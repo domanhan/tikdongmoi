@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Hoạt ảnh TikZ - Toán học Nền Tối</title>
+    <style>
+        /* GIAO DIỆN NỀN TỐI CAO CẤP */
+        body {
+            background-color: #1a1b26; /* Màu nền Dark Theme (Tokyo Night) */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Times New Roman', Times, serif;
+            font-style: italic;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 600px;
+            height: 500px;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* 1. HIỆU ỨNG TỰ VẼ NÉT (DRAW PATH) */
+        .draw-path {
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 3000; /* Đủ lớn để bao phủ mọi đường */
+            stroke-dashoffset: 3000;
+            animation: drawAnim var(--dur, 2s) ease-in-out forwards;
+            animation-delay: var(--delay, 0s);
+        }
+        @keyframes drawAnim { to { stroke-dashoffset: 0; } }
+
+        /* 2. HIỆU ỨNG HIỆN DẦN (FADE IN) */
+        .fade-in {
+            opacity: 0;
+            animation: fadeInAnim 0.5s ease-out forwards;
+            animation-delay: var(--delay, 0s);
+        }
+        @keyframes fadeInAnim { to { opacity: 1; } }
+
+        /* 3. HIỆU ỨNG NÉT ĐỨT THÀNH NÉT LIỀN (DASHED TO SOLID) */
+        .dashed-to-solid {
+            fill: none;
+            stroke: #e0af68; 
+            stroke-width: 2;
+            stroke-dasharray: 8, 8; 
+            opacity: 0;
+            animation: 
+                fadeInAnim 0.5s ease-out forwards 7.5s,
+                makeSolid 1s ease-in-out forwards 9s;
+        }
+        @keyframes makeSolid { to { stroke-dasharray: 3000, 0; } }
+
+        /* 4. HIỆU ỨNG ĐIỂM SÁNG CHẠY Ở ĐẦU NÉT VẼ */
+        .glowing-dot {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            top: -5px; left: -5px; 
+            opacity: 0;
+            offset-path: var(--path);
+            animation: moveDot var(--dur) ease-in-out forwards;
+            animation-delay: var(--delay);
+        }
+        @keyframes moveDot {
+            0% { offset-distance: 0%; opacity: 1; }
+            95% { opacity: 1; }
+            100% { offset-distance: 100%; opacity: 0; }
+        }
+
+        /* Tùy chỉnh màu sắc điểm sáng */
+        .dot-blue { background: #7aa2f7; box-shadow: 0 0 15px 5px rgba(122, 162, 247, 0.8); }
+        .dot-white { background: #a9b1d6; box-shadow: 0 0 15px 5px rgba(169, 177, 214, 0.8); }
+        .dot-purple { background: #bb9af7; box-shadow: 0 0 15px 5px rgba(187, 154, 247, 0.8); }
+        .dot-green { background: #9ece6a; box-shadow: 0 0 15px 5px rgba(158, 206, 106, 0.8); }
+    </style>
+</head>
+<body>
+
+<div class="canvas-container" id="container">
+    
+    <div id="glows"></div>
+
+    <svg viewBox="-200 -250 500 500" id="mathSvg">
+        <path id="circleO" class="draw-path" style="stroke: #7aa2f7; stroke-width: 2; --dur: 2s; --delay: 0s;"></path>
+        
+        <path id="pathOBA" class="draw-path" style="stroke: #a9b1d6; stroke-width: 2; --dur: 1.5s; --delay: 2.5s;"></path>
+        <path id="pathOCA" class="draw-path" style="stroke: #a9b1d6; stroke-width: 2; --dur: 1.5s; --delay: 2.5s;"></path>
+        
+        <path id="rightB" class="fade-in" style="stroke: #f7768e; stroke-width: 1.5; fill: none; --delay: 4s;"></path>
+        <path id="rightC" class="fade-in" style="stroke: #f7768e; stroke-width: 1.5; fill: none; --delay: 4s;"></path>
+
+        <path id="pathOA" class="draw-path" style="stroke: #bb9af7; stroke-width: 1.5; --dur: 1s; --delay: 4.5s;"></path>
+        <path id="pathBC" class="draw-path" style="stroke: #bb9af7; stroke-width: 1.5; --dur: 1s; --delay: 4.5s;"></path>
+
+        <path id="pathSecant" class="draw-path" style="stroke: #9ece6a; stroke-width: 1.5; --dur: 1.5s; --delay: 6s;"></path>
+        <path id="pathOE" class="draw-path" style="stroke: #9ece6a; stroke-width: 1.5; --dur: 1s; --delay: 6s;"></path>
+        <path id="pathDB" class="draw-path" style="stroke: #9ece6a; stroke-width: 1.5; --dur: 1s; --delay: 6s;"></path>
+        <path id="angleDBA" class="fade-in" style="fill: rgba(169, 177, 214, 0.3); --delay: 7s;"></path>
+
+        <circle id="circleM" class="dashed-to-solid"></circle>
+
+        <g id="dots" fill="#fff">
+            <circle id="dotO" r="3.5" class="fade-in" style="--delay: 1.5s;"></circle>
+            <circle id="dotA" r="3.5" class="fade-in" style="--delay: 3.5s;"></circle>
+            <circle id="dotB" r="3.5" class="fade-in" style="--delay: 3.5s;"></circle>
+            <circle id="dotC" r="3.5" class="fade-in" style="--delay: 3.5s;"></circle>
+            <circle id="dotD" r="3.5" class="fade-in" style="--delay: 6.5s;"></circle>
+            <circle id="dotE" r="3.5" class="fade-in" style="--delay: 6.5s;"></circle>
+            <circle id="dotM" r="3.5" class="fade-in" style="--delay: 8s;"></circle>
+        </g>
+
+        <g id="labels" fill="#fff" font-size="20">
+            <text id="lblO" class="fade-in" style="--delay: 1.5s;">O</text>
+            <text id="lblA" class="fade-in" style="--delay: 3.5s;">A</text>
+            <text id="lblB" class="fade-in" style="--delay: 3.5s;">B</text>
+            <text id="lblC" class="fade-in" style="--delay: 3.5s;">C</text>
+            <text id="lblD" class="fade-in" style="--delay: 6.5s;">D</text>
+            <text id="lblE" class="fade-in" style="--delay: 6.5s;">E</text>
+            <text id="lblM" class="fade-in" style="--delay: 8s;">M</text>
+        </g>
+    </svg>
+</div>
+
+<script>
+    // --- TOÁN HỌC VECTOR ---
+    const R = 130; 
+    const O = { x: 0, y: 0 };
+    const alpha = 50 * Math.PI / 180;
+    
+    // Y trong SVG hướng xuống, nên ta đảo dấu góc để hình giống hệt TikZ
+    const B = { x: R * Math.cos(-alpha), y: R * Math.sin(-alpha) };
+    const C = { x: R * Math.cos(alpha), y: R * Math.sin(alpha) };
+    const OA_len = R / Math.cos(alpha);
+    const A = { x: OA_len, y: 0 };
+    const M = { x: OA_len / 2, y: 0 };
+    const r_M = OA_len / 2;
+
+    function getD(k_val) {
+        let theta = -alpha * k_val;
+        return { x: R * Math.cos(theta), y: R * Math.sin(theta) };
+    }
+
+    function getE(ptA, ptD, ptO) {
+        let vx = ptD.x - ptA.x, vy = ptD.y - ptA.y;
+        let wx = ptO.x - ptA.x, wy = ptO.y - ptA.y;
+        let t = (wx * vx + wy * vy) / (vx * vx + vy * vy);
+        let Ix = ptA.x + t * vx, Iy = ptA.y + t * vy;
+        return { x: 2 * Ix - ptD.x, y: 2 * Iy - ptD.y };
+    }
+
+    function getRightAngle(vertex, p1, p2, size = 15) {
+        let v1 = { x: p1.x - vertex.x, y: p1.y - vertex.y };
+        let len1 = Math.hypot(v1.x, v1.y); v1 = { x: v1.x/len1, y: v1.y/len1 };
+        let v2 = { x: p2.x - vertex.x, y: p2.y - vertex.y };
+        let len2 = Math.hypot(v2.x, v2.y); v2 = { x: v2.x/len2, y: v2.y/len2 };
+        return `M ${vertex.x + v1.x*size} ${vertex.y + v1.y*size} 
+                L ${vertex.x + (v1.x+v2.x)*size} ${vertex.y + (v1.y+v2.y)*size} 
+                L ${vertex.x + v2.x*size} ${vertex.y + v2.y*size}`;
+    }
+
+    function getAngleFill(ptB, ptA, ptD, size = 25) {
+        let angBA = Math.atan2(ptA.y - ptB.y, ptA.x - ptB.x);
+        let angBD = Math.atan2(ptD.y - ptB.y, ptD.x - ptB.x);
+        let p1 = { x: ptB.x + size * Math.cos(angBD), y: ptB.y + size * Math.sin(angBD) };
+        let p2 = { x: ptB.x + size * Math.cos(angBA), y: ptB.y + size * Math.sin(angBA) };
+        let sweep = ((p1.x - ptB.x)*(p2.y - ptB.y) - (p1.y - ptB.y)*(p2.x - ptB.x)) > 0 ? 1 : 0;
+        return `M ${ptB.x} ${ptB.y} L ${p1.x} ${p1.y} A ${size} ${size} 0 0 ${sweep} ${p2.x} ${p2.y} Z`;
+    }
+
+    // --- KHỞI TẠO VÀ CẬP NHẬT GIAO DIỆN ---
+    let currentK = 0.3;
+
+    function updateGeometry(k) {
+        let D = getD(k);
+        let E = getE(A, D, O);
+
+        // Path vẽ hình
+        const d_CircleO = `M ${O.x+R} ${O.y} A ${R} ${R} 0 1 1 ${O.x+R} ${O.y-0.1}`;
+        const d_OBA = `M ${O.x} ${O.y} L ${B.x} ${B.y} L ${A.x} ${A.y}`;
+        const d_OCA = `M ${O.x} ${O.y} L ${C.x} ${C.y} L ${A.x} ${A.y}`;
+        const d_OA = `M ${O.x} ${O.y} L ${A.x} ${A.y}`;
+        const d_BC = `M ${B.x} ${B.y} L ${C.x} ${C.y}`;
+        const d_Secant = `M ${A.x} ${A.y} L ${E.x} ${E.y}`;
+        const d_OE = `M ${O.x} ${O.y} L ${E.x} ${E.y}`;
+        const d_DB = `M ${D.x} ${D.y} L ${B.x} ${B.y}`;
+
+        // Set path
+        document.getElementById('circleO').setAttribute('d', d_CircleO);
+        document.getElementById('pathOBA').setAttribute('d', d_OBA);
+        document.getElementById('pathOCA').setAttribute('d', d_OCA);
+        document.getElementById('pathOA').setAttribute('d', d_OA);
+        document.getElementById('pathBC').setAttribute('d', d_BC);
+        document.getElementById('pathSecant').setAttribute('d', d_Secant);
+        document.getElementById('pathOE').setAttribute('d', d_OE);
+        document.getElementById('pathDB').setAttribute('d', d_DB);
+
+        // Góc & Fill
+        document.getElementById('rightB').setAttribute('d', getRightAngle(B, O, A));
+        document.getElementById('rightC').setAttribute('d', getRightAngle(C, A, O));
+        document.getElementById('angleDBA').setAttribute('d', getAngleFill(B, A, D));
+
+        // Đường tròn tâm M
+        let circM = document.getElementById('circleM');
+        circM.setAttribute('cx', M.x); circM.setAttribute('cy', M.y); circM.setAttribute('r', r_M);
+
+        // Các điểm 
+        const setPt = (id, pt) => { let el = document.getElementById(id); el.setAttribute('cx', pt.x); el.setAttribute('cy', pt.y); };
+        setPt('dotO', O); setPt('dotA', A); setPt('dotB', B); setPt('dotC', C);
+        setPt('dotD', D); setPt('dotE', E); setPt('dotM', M);
+
+        // Nhãn
+        const setLbl = (id, pt, dx, dy) => { let el = document.getElementById(id); el.setAttribute('x', pt.x+dx); el.setAttribute('y', pt.y+dy); };
+        setLbl('lblO', O, -20, 25); setLbl('lblA', A, 15, 5);
+        setLbl('lblB', B, 0, -15);  setLbl('lblC', C, -5, 25);
+        setLbl('lblD', D, 15, -15); setLbl('lblE', E, -25, -5);
+        setLbl('lblM', M, 5, 25);
+
+        // Trả về dữ liệu path để tạo glowing dots
+        return { d_CircleO, d_OBA, d_OCA, d_OA, d_BC, d_Secant, d_OE, d_DB };
+    }
+
+    // --- KHỞI TẠO ĐIỂM SÁNG CHẠY (GLOWING DOTS) ---
+    function createGlowDots(paths) {
+        const glowContainer = document.getElementById('glows');
+        const dotsConfig = [
+            { path: paths.d_CircleO, delay: '0s', dur: '2s', colorClass: 'dot-blue' },
+            { path: paths.d_OBA, delay: '2.5s', dur: '1.5s', colorClass: 'dot-white' },
+            { path: paths.d_OCA, delay: '2.5s', dur: '1.5s', colorClass: 'dot-white' },
+            { path: paths.d_OA, delay: '4.5s', dur: '1s', colorClass: 'dot-purple' },
+            { path: paths.d_BC, delay: '4.5s', dur: '1s', colorClass: 'dot-purple' },
+            { path: paths.d_Secant, delay: '6s', dur: '1.5s', colorClass: 'dot-green' },
+            { path: paths.d_OE, delay: '6s', dur: '1s', colorClass: 'dot-green' },
+            { path: paths.d_DB, delay: '6s', dur: '1s', colorClass: 'dot-green' }
+        ];
+
+        // Khung nhìn của SVG là ViewBox -200 -250. HTML div cần offset lại cho chuẩn.
+        let offsetX = 250; 
+        let offsetY = 250;
+
+        dotsConfig.forEach(cfg => {
+            let dot = document.createElement('div');
+            dot.className = `glowing-dot ${cfg.colorClass}`;
+            // Điều chỉnh offset-path theo hệ tọa độ của SVG (dịch chuyển +200 x, +250 y)
+            let adjustedPath = cfg.path.replace(/([A-Z])|([-\d.]+)/g, (match, letter, num) => {
+                if (letter) return letter;
+                return parseFloat(num);
+            });
+            dot.style.cssText = `offset-path: path('${adjustedPath}'); --dur: ${cfg.dur}; --delay: ${cfg.delay}; left: ${offsetX}px; top: ${offsetY}px;`;
+            glowContainer.appendChild(dot);
+        });
+    }
+
+    // --- TIMELINE VÀ CHUYỂN ĐỘNG JS ---
+    let initialPaths = updateGeometry(currentK);
+    createGlowDots(initialPaths);
+
+    // Đợi 10.5 giây cho toàn bộ CSS animations (vẽ nét, điểm sáng) chạy xong
+    setTimeout(() => {
+        // Gỡ bỏ class tĩnh để JS tiếp quản mượt mà mà không bị nháy nét
+        document.querySelectorAll('.draw-path, .dashed-to-solid').forEach(el => {
+            el.style.animation = 'none';
+            el.style.strokeDasharray = 'none'; 
+            el.style.strokeDashoffset = '0';
+            el.style.opacity = '1';
+        });
+
+        // Vòng lặp chuyển động JS
+        let kPhase = 0; // 0: chạy lên 0.9, 1: chạy lùi -0.9, 2: về 0.3
+        let lastTime = performance.now();
+
+        function animateMotion(time) {
+            let dt = time - lastTime;
+            lastTime = time;
+            let speed = 0.0006 * dt;
+
+            if (kPhase === 0) {
+                currentK += speed;
+                if (currentK >= 0.9) { currentK = 0.9; kPhase = 1; }
+            } else if (kPhase === 1) {
+                currentK -= speed;
+                if (currentK <= -0.9) { currentK = -0.9; kPhase = 2; }
+            } else if (kPhase === 2) {
+                currentK += speed;
+                if (currentK >= 0.3) { currentK = 0.3; kPhase = 0; } // Lặp vô tận
+            }
+
+            updateGeometry(currentK);
+            requestAnimationFrame(animateMotion);
+        }
+        
+        requestAnimationFrame(animateMotion);
+    }, 10500); 
+
+</script>
+</body>
+</html>

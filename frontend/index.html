@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathAnim Builder</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden flex flex-col font-sans">
+    
+    <!-- Navbar -->
+    <header class="bg-gray-800 text-white p-3 flex justify-between items-center shadow-md z-10">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-shapes text-xl text-blue-400"></i>
+            <h1 class="text-xl font-bold tracking-wide">MathAnim Builder</h1>
+        </div>
+        <div class="flex gap-3">
+            <button id="btn-run" class="bg-green-600 hover:bg-green-500 px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2">
+                <i class="fa-solid fa-play"></i> Run Code
+            </button>
+            <button id="btn-export-html" class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2">
+                <i class="fa-solid fa-person-chalkboard"></i> Export Step-by-Step
+            </button>
+            <button id="btn-export-auto" class="bg-purple-600 hover:bg-purple-500 px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2" title="Tiện quay video hoặc auto-play liên tục">
+                <i class="fa-solid fa-film"></i> Export AutoPlay
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Panel: Code Area (Tikz Input) -->
+        <section class="w-1/3 min-w-[300px] flex flex-col border-r border-gray-300 bg-white">
+            <div class="bg-gray-200 p-2 text-sm font-semibold text-gray-700 flex justify-between items-center border-b border-gray-300">
+                <span><i class="fa-solid fa-code mr-1"></i> TikZ Code Area</span>
+                <span class="text-xs bg-gray-300 px-2 rounded">Backend Input</span>
+            </div>
+            <textarea id="tikz-input" class="flex-1 p-4 font-mono text-sm bg-gray-50 text-gray-800 focus:outline-none resize-none leading-relaxed" spellcheck="false">\begin{tikzpicture}
+% 1. Thế giới vô hình (Math/Logic - Không render)
+\coordinate (O) at (0,0);
+\coordinate (A) at (2,0);
+\path [name path=circle1] (O) circle (2);
+
+% 2. Thế giới hữu hình (Visuals - Da thịt)
+\draw [thick, blue] (O) circle (2);
+\fill [red] (O) circle (2pt) node[below left]{$O$};
+\draw [thick] (O) -- (A) node[midway, below]{$R$};
+\end{tikzpicture}</textarea>
+        </section>
+
+        <!-- Center Panel: Canvas Area -->
+        <section class="flex-1 flex flex-col bg-gray-100">
+            <div class="bg-gray-200 p-2 text-sm font-semibold text-gray-700 border-b border-gray-300 flex justify-between items-center">
+                <span><i class="fa-solid fa-display mr-1"></i> Canvas Preview</span>
+                <div class="flex gap-2">
+                    <button class="text-gray-500 hover:text-gray-800" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                    <button class="text-gray-500 hover:text-gray-800" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                </div>
+            </div>
+            <div class="flex-1 flex items-center justify-center relative overflow-hidden bg-white shadow-inner m-4 rounded outline outline-1 outline-gray-300" id="canvas-container">
+                <!-- SVG or Canvas element will be rendered here -->
+                <div class="text-gray-400 text-center flex flex-col items-center">
+                    <i class="fa-solid fa-vector-square text-5xl mb-3 opacity-50"></i>
+                    <p class="font-medium text-gray-500">Màn hình hiển thị hoạt cảnh</p>
+                    <p class="text-xs mt-1">(JS tính toán frame và vẽ tại đây)</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Outliner & Timeline -->
+        <section class="w-[40%] min-w-[450px] flex flex-col border-l border-gray-300 bg-white shadow-xl z-20">
+            
+            <!-- Outliner Header -->
+            <div class="h-[45%] flex flex-col border-b border-gray-300 overflow-hidden bg-white">
+                <div class="bg-gray-200 p-2 text-sm font-semibold text-gray-700 border-b border-gray-300 flex justify-between items-center shadow-sm">
+                    <span><i class="fa-solid fa-layer-group text-blue-500 mr-2"></i> Objects Outliner</span>
+                    <button id="btn-auto-assign" class="px-2 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded text-xs transition" title="Auto-Assign Effects"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto</button>
+                </div>
+                
+                <!-- Split View -->
+                <div class="flex-1 flex overflow-hidden">
+                    <!-- Left: Object List -->
+                    <div class="w-1/2 overflow-y-auto p-2 border-r border-gray-200" id="outliner">
+                        <!-- Object Items will be generated here by JS -->
+                    </div>
+                    <!-- Right: Selected Object Properties -->
+                    <div class="w-1/2 overflow-y-auto p-3 bg-gray-50 flex flex-col" id="outliner-props">
+                        <div class="text-xs text-gray-400 italic text-center mt-10">Chọn 1 đối tượng<br>để cấu hình hiệu ứng.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Effect Dropdown Menu (Remnant, can be removed but keeping is safe) -->
+            <div id="effect-menu" class="hidden absolute bg-white shadow-lg border border-gray-200 rounded-md py-1 text-sm z-50 w-40"></div>
+
+            <!-- Timeline (Hiệu ứng theo Steps) -->
+            <div class="h-[55%] flex flex-col bg-gray-50 relative">
+                <div class="bg-gray-200 p-2 text-sm font-semibold text-gray-700 border-b border-gray-300 flex justify-between items-center z-10 shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol text-blue-500"></i>
+                        <span>Steps Manager</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="btn-add-step" class="px-3 py-1 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 rounded shadow-sm text-sm font-medium transition"><i class="fa-solid fa-plus"></i> Step Mới</button>
+                        <button id="btn-play-step" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded shadow-sm text-sm font-medium transition" disabled><i class="fa-solid fa-play"></i> Play Step</button>
+                        <button id="btn-play-all" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded shadow-sm text-sm font-medium transition" disabled><i class="fa-solid fa-forward"></i> Play All</button>
+                        <button id="btn-stop-step" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded shadow-sm text-sm font-medium transition" disabled><i class="fa-solid fa-stop"></i></button>
+                    </div>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-3" id="timeline-steps">
+                    <!-- Current Active Step (Default Step 1) -->
+                    <div class="step-container border border-blue-300 rounded-md mb-4 bg-white shadow-sm overflow-hidden" data-step="1">
+                        <div class="bg-blue-50 px-3 py-1.5 border-b border-blue-200 flex justify-between items-center cursor-pointer hover:bg-blue-100 transition-colors">
+                            <span class="font-bold text-blue-800 text-sm"><i class="fa-solid fa-caret-down text-xs mr-1"></i> Step 1</span>
+                            <span class="text-xs text-blue-500 bg-white px-1.5 py-0.5 rounded border border-blue-200">0 effects</span>
+                        </div>
+                        <div class="p-2 step-effects-list min-h-[40px] flex flex-col gap-2">
+                            <div class="text-xs text-gray-400 italic text-center w-full py-2">Chưa có hiệu ứng. Bấm nút 🪄 ở bảng trên để thêm.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Effect Editor Modal -->
+    <div id="effect-editor-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-96 p-5">
+            <h3 class="text-lg font-bold mb-4 text-gray-800"><i class="fa-solid fa-sliders text-blue-500 mr-2"></i> Edit Effect</h3>
+            <input type="hidden" id="edit-step-idx">
+            <input type="hidden" id="edit-eff-idx">
+            
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Duration (ms)</label>
+                <input type="number" id="edit-duration" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" min="100" step="100">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Color Options (e.g. #ff0000, blue)</label>
+                <input type="text" id="edit-color" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" placeholder="Mặc định">
+            </div>
+
+            <!-- Wait, different effects have different params. MVP: Just let user type a color string, fill opacity etc. or save generic object -->
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Extra Options (JSON format)</label>
+                <textarea id="edit-params" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono h-20" placeholder='{"opacity": 0.5, "dashed": true}'></textarea>
+                <p class="text-[10px] text-gray-500 mt-1">Ghi chú: Đối với fill có thể dùng {"fillOpacity": "0.5", "fill": "red"}. Đối với draw_dashed_light có thể chỉnh {"dashed": "5,10"}</p>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-6">
+                <button onclick="closeEffectEditor()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm font-medium transition">Hủy</button>
+                <button onclick="saveEffectParams()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium transition">Lưu thay đổi</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "schema_version": "1.1.0",
+    "awf_version": "3.3.0"
+  },
+  "project": {
+    "name": "MathAnim Builder",
+    "type": "Web Application",
+    "status": "In Development (Phase 5 Refinement)"
+  },
+  "tech_stack": {
+    "frontend": "HTML, Vanilla JS, Tailwind CSS, SVG",
+    "backend": "Python, FastAPI",
+    "database": "None (File-based JSON/HTML export)"
+  },
+  "database_schema": {
+    "tables": [],
+    "relationships": []
+  },
+  "api_endpoints": [
+    {
+      "path": "/api/bake",
+      "method": "POST",
+      "explained": "Nhận mã TikZ từ người dùng, parser ra thành Abstract Syntax Tree (tọa độ tính toán) và Visual Objects (các lệnh vẽ), trả về data JSON cho Frontend render SVG."
+    },
+    {
+      "path": "/api/export",
+      "method": "POST",
+      "explained": "Đóng gói toàn bộ data (visual objects, frames, steps) cùng với Player JS vào trong 1 file HTML duy nhất để chạy standalone (offline)."
+    }
+  ],
+  "business_rules": [
+    "Dịch mã Tikz thuần túy thành các khung hình vector.",
+    "Bóc tách giữa phần tính toán tọa độ (Math Engine) và phần hiển thị (Visual Objects).",
+    "Hiệu ứng được gộp theo Từng bước (Steps) giống như trình chiếu PowerPoint."
+  ],
+  "features": [
+    "Live Preview: Gõ mã TikZ -> Render sang SVG ngay lập tức",
+    "Timeline Editor: Quản lý animation theo dạng Step-by-Step, hỗ trợ Drag & Drop, Play All",
+    "Effects Engine: Hỗ trợ fade_in, draw, draw_light, draw_dashed_light, fill, move",
+    "Auto-Assign: Tự động gắn hiệu ứng dựa trên loại object (vd hình tròn -> draw_light)",
+    "HTML Export: Xuất thẳng ra 1 file HTML standalone để chia sẻ học sinh/giáo viên."
+  ],
+  "knowledge_items": {
+    "patterns": [
+      "Kiến trúc Step-based animation: Gom cụm hiệu ứng theo Step thay vì theo Timestamp",
+      "Kéo thả (HTML5 Drag & Drop) trong giao diện để thay đổi Timeline",
+      "SVG Overdrawing (vẽ lố 5px) để triệt tiêu khoảng hở (gap) nơi điểm đầu và cuối của đường tròn khép kín"
+    ],
+    "gotchas": [
+      "Khi Regex parse TikZ, bắt gặp nhiều dấu phẩy hoặc khoảng trắng không đồng nhất phải dùng Regex linh hoạt (vd: parse `draw` nhiều điểm thành 1 polyline thay vì dùng `draw_line` cố định)",
+      "Quản lý HTML template từ Backend nhưng xuất ra dạng Download (Blob) bên Frontend thay vì redirect."
+    ],
+    "conventions": []
+  }
+}

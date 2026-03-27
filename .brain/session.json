@@ -1,0 +1,55 @@
+{
+  "updated_at": "2026-03-27T01:34:00+07:00",
+  "working_on": {
+    "feature": "Phase 05: Timeline & Effect System",
+    "task": "Refining timeline interactivity and effect assignment logic",
+    "status": "in_progress",
+    "files": [
+      "frontend/main.js",
+      "backend/tikz_parser.py"
+    ],
+    "blockers": [],
+    "notes": "User thông báo 'vẫn còn lỗi mai làm tiếp nhé'. Cần hỏi rõ lỗi ở đâu vào phiên làm việc ngày mai."
+  },
+  "pending_tasks": [
+    {
+      "task": "Điều tra lỗi còn sót chưa rõ ràng",
+      "priority": "high",
+      "notes": "Kiểm tra lại việc parse cycle cho đa giác và các đường thẳng đứt quãng xem auto-assign đã thực sự hoạt động trơn tru 100% chưa."
+    }
+  ],
+  "recent_changes": [
+    {
+      "timestamp": "2026-03-27T01:30:00+07:00",
+      "type": "feature",
+      "description": "Fix SVG circle overdraw (gap fix), refactor draw_lines Regex, thêm Play All button, chia đôi màn hình Outliner Panel",
+      "files": [
+        "frontend/main.js",
+        "frontend/index.html",
+        "backend/tikz_parser.py"
+      ]
+    }
+  ],
+  "errors_encountered": [
+    {
+      "error": "Lỗi parser cũ không nhận diện được \\draw (A)--(B); nếu viết dính chùm",
+      "solution": "Sửa Regex draw_lines để quét [^-;]+--[^;]+",
+      "resolved": true
+    },
+    {
+      "error": "Lỗi chưa rõ (User report: 'vẫn còn lỗi mai làm tiếp nhé')",
+      "solution": "Ngày mai cần hỏi user cụ thể để fix",
+      "resolved": false
+    }
+  ],
+  "decisions_made": [
+    {
+      "decision": "Dùng Cột Đôi cho Outliner thay vì Context Menu Popup",
+      "reason": "Vì Object có nhiều properties (Duration, Color, Params Json) nên phải đưa ra Panel Edit trực quan bên phải"
+    },
+    {
+      "decision": "Bỏ Auto-assign Draw Light cho Polygon/Line",
+      "reason": "Chỉ giữ hiệu ứng đốm sáng cho Circle theo yêu cầu của user, các đường lưới thông thường chỉ lấy Draw cơ bản"
+    }
+  ]
+}

@@ -379,15 +379,21 @@ function initStepUI() {
 
     // Step Managers
     document.getElementById('btn-auto-assign').addEventListener('click', () => {
+        console.log("Auto-assign clicked. visualObjects:", window.visualObjects);
         if (!window.visualObjects || window.visualObjects.length === 0) {
             alert("Vui lòng Run Code trước để tạo các đối tượng.");
             return;
         }
+        if (!confirm("Tự động tạo các Step từng phần tử một cho tất cả đối tượng? (Sẽ ghi đè Timeline hiện tại)")) return;
+        
+        window.player.steps = [];
+        window.player.currentStep = 0;
         
         window.visualObjects.forEach((obj, idx) => {
             let effectType = "fade_in";
             let duration = 800;
             
+            // Logic gắn hiệu ứng phù hợp cho từng loại
             const type = obj.type || "";
             if (type === "draw_circle") {
                 effectType = "draw_light";
@@ -412,6 +418,7 @@ function initStepUI() {
                 duration = 1000;
             }
             
+            console.log(`Auto: Adding obj ${obj._id} with effect ${effectType}`);
             window.player.steps.push([{
                 target_id: obj._id,
                 type: effectType,
@@ -419,7 +426,8 @@ function initStepUI() {
             }]);
         });
         
-        if (window.player.currentStep <= 0 && window.player.steps.length > 0) window.player.currentStep = 1;
+        if (window.player.steps.length > 0) window.player.currentStep = 1;
+        console.log("Auto: Final steps count:", window.player.steps.length);
         renderStepsUI();
     });
 
@@ -782,14 +790,7 @@ class MathAnimPlayer {
             }
 
             mainLayer.appendChild(group);
-            const attrs = parseOpts(obj.options);
-            this.svgElements[obj._id] = { 
-                dom: dom, 
-                group: group, 
-                obj: obj,
-                originalStroke: attrs.stroke,
-                originalFill: attrs.fill
-            };
+            this.svgElements[obj._id] = { dom: dom, group: group, obj: obj };
         });
     }
 
@@ -869,47 +870,16 @@ class MathAnimPlayer {
     }
 
     jumpToStep(targetStep) {
-        // [HARD RESET]: Trả toàn bộ SVG về trạng thái nguyên bản (Frame 0)
-        const points0 = (this.frames && this.frames.length > 0) ? this.frames[0].points : {};
-        
+        // Reset everything to hidden
         Object.values(this.svgElements).forEach(item => {
-            const obj = item.obj;
-            // 1. Reset Opacity
-            item.group.style.opacity = "0";
-            
-            // 2. Reset Stroke/Fill/Dash
+            if (item.group) item.group.style.opacity = "0";
             if (item.dom && item.dom.style) {
                 item.dom.style.strokeDasharray = "none"; 
                 item.dom.style.strokeDashoffset = "0";
-                item.dom.style.stroke = item.originalStroke || "#333";
-                // Lấy fill ưu tiên từ data-origin-fill nếu có
-                const fillFromAttr = item.dom.getAttribute('data-origin-fill');
-                item.dom.setAttribute("fill", fillFromAttr || item.originalFill || "none");
-            }
-            
-            // 3. Reset Tọa độ về Frame 0
-            if (obj.type === "draw_circle") {
-                const center = points0[obj.center] || { x: 0, y: 0 };
-                item.dom.setAttribute("cx", this.transformX(center.x));
-                item.dom.setAttribute("cy", this.transformY(center.y));
-            } else if (obj.type === "draw_lines") {
-                const pts = obj.points.map(pName => points0[pName] || { x: 0, y: 0 });
-                let d = "";
-                pts.forEach((p, idx) => {
-                    const mappedX = this.transformX(p.x);
-                    const mappedY = this.transformY(p.y);
-                    if (idx === 0) d += `M ${mappedX} ${mappedY} `;
-                    else d += `L ${mappedX} ${mappedY} `;
-                });
-                if (obj.close_path) d += "Z";
-                item.dom.setAttribute("d", d);
-            } else {
-                // Các node chữ/điểm phức tạp
-                this.updateComplexObject(obj, item.group, points0);
             }
         });
         
-        // [FAST-FORWARD]: Chạy logic áp dụng nhanh các hiệu ứng đến Step mục tiêu
+        // Apply effects sequentially without animation
         for(let i=0; i<targetStep; i++) {
             const effects = this.steps[i];
             if (!effects) continue;

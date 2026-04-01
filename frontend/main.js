@@ -384,7 +384,11 @@ function initStepUI() {
             return;
         }
         
-        window.visualObjects.forEach((obj, idx) => {
+        // Quay lại logic mỗi object 1 step (tuần tự)
+        window.player.steps = [];
+        window.player.currentStep = 0;
+        
+        window.visualObjects.forEach((obj) => {
             let effectType = "fade_in";
             let duration = 800;
             
@@ -419,7 +423,7 @@ function initStepUI() {
             }]);
         });
         
-        if (window.player.currentStep <= 0 && window.player.steps.length > 0) window.player.currentStep = 1;
+        if (window.player.steps.length > 0) window.player.currentStep = 1;
         renderStepsUI();
     });
 
@@ -498,21 +502,49 @@ function initStepUI() {
         }
     });
 
-    // Event Delegation cho các nút Xóa hiệu ứng trong Timeline
+    // Event Delegation tập trung cho toàn bộ Timeline
     const timelineContainer = document.getElementById('timeline-steps');
     if (timelineContainer) {
         timelineContainer.addEventListener('click', (e) => {
-            const deleteBtn = e.target.closest('.delete-eff-btn');
-            if (deleteBtn) {
+            // 1. Nút xóa hiệu ứng (Phải check TRƯỚC khi check item)
+            const deleteEffBtn = e.target.closest('.delete-eff-btn');
+            if (deleteEffBtn) {
+                e.preventDefault();
                 e.stopPropagation();
-                const stepIdx = parseInt(deleteBtn.getAttribute('data-step'));
-                const effIdx = parseInt(deleteBtn.getAttribute('data-eff'));
-                console.log(`Deleting: step ${stepIdx}, eff ${effIdx}`);
+                const stepIdx = parseInt(deleteEffBtn.getAttribute('data-step'));
+                const effIdx = parseInt(deleteEffBtn.getAttribute('data-eff'));
                 window.deleteEffect(stepIdx, effIdx);
+                return;
+            }
+            
+            // 2. Click vào hiệu ứng đơn lẻ -> Mở Editor
+            const effectItem = e.target.closest('.effect-item');
+            if (effectItem) {
+                const stepIdx = parseInt(effectItem.getAttribute('data-step'));
+                const effIdx = parseInt(effectItem.getAttribute('data-eff'));
+                window.openEffectEditor(stepIdx, effIdx);
+                return;
+            }
+
+            // 3. Nút xóa Step
+            const deleteStepBtn = e.target.closest('.delete-step-btn');
+            if (deleteStepBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const stepIdx = parseInt(deleteStepBtn.getAttribute('data-step'));
+                window.deleteStep(stepIdx);
+                return;
+            }
+            
+            // 4. Click vào Header của Step -> Chuyển active step
+            const stepHeader = e.target.closest('.step-header');
+            if (stepHeader) {
+                const stepIdx = parseInt(stepHeader.getAttribute('data-step'));
+                window.player.currentStep = stepIdx + 1;
+                renderStepsUI();
+                return;
             }
         });
-    } else {
-        console.error("Critical: #timeline-steps not found!");
     }
 }
 
@@ -546,12 +578,12 @@ function renderStepsUI() {
             if (eff.color) formatStr += `, ${eff.color}`;
             
             effectsHtml += `
-                <div class="flex flex-col text-xs bg-gray-50 border border-gray-200 rounded p-2 mb-1 cursor-pointer hover:border-blue-400 group" 
+                <div class="flex flex-col text-xs bg-gray-50 border border-gray-200 rounded p-2 mb-1 cursor-pointer hover:border-blue-400 group effect-item" 
                     draggable="true" 
+                    data-step="${index}" data-eff="${effIdx}"
                     ondragstart="window.handleDragStart(event, ${index}, ${effIdx})" 
                     ondragover="window.handleDragOver(event)" 
-                    ondrop="window.handleDrop(event, ${index}, ${effIdx})"
-                    onclick="window.openEffectEditor(${index}, ${effIdx})">
+                    ondrop="window.handleDrop(event, ${index}, ${effIdx})">
                     <div class="flex justify-between items-center">
                         <span class="font-mono text-gray-700 font-bold">${eff.target_id}</span>
                         <div class="flex gap-2 items-center">
@@ -566,12 +598,15 @@ function renderStepsUI() {
         const stepDiv = document.createElement('div');
         stepDiv.className = `step-container border rounded-md mb-4 shadow-sm overflow-hidden ${isActive ? 'bg-white border-blue-500 ring-1 ring-blue-500' : 'bg-gray-50 border-gray-300'}`;
         stepDiv.innerHTML = `
-            <div class="px-3 py-1.5 border-b flex justify-between items-center cursor-pointer transition-colors ${isActive ? 'bg-blue-100 border-blue-300' : 'bg-gray-200 border-gray-300 hover:bg-gray-300'}" 
-                 onclick="window.player.currentStep=${stepNum}; renderStepsUI();"
+            <div class="px-3 py-1.5 border-b flex justify-between items-center cursor-pointer transition-colors step-header ${isActive ? 'bg-blue-100 border-blue-300' : 'bg-gray-200 border-gray-300 hover:bg-gray-300'}" 
+                 data-step="${index}"
                  ondragover="window.handleDragOver(event)"
                  ondrop="window.handleStepDrop(event, ${index})">
-                <span class="font-bold ${isActive ? 'text-blue-800' : 'text-gray-700'} text-sm">Step ${stepNum}</span>
-                <span class="text-xs ${isActive ? 'text-blue-600' : 'text-gray-500'} bg-white px-1.5 py-0.5 rounded border border-gray-200">${stepEffects.length} effects</span>
+                <div class="flex items-center gap-2">
+                    <span class="font-bold ${isActive ? 'text-blue-800' : 'text-gray-700'} text-sm">Step ${stepNum}</span>
+                    <span class="text-[10px] ${isActive ? 'text-blue-600' : 'text-gray-500'} bg-white px-1 py-0.5 rounded border border-gray-200">${stepEffects.length} effects</span>
+                </div>
+                <button class="text-gray-400 hover:text-red-500 p-1 delete-step-btn" data-step="${index}"><i class="fa-solid fa-trash-can"></i></button>
             </div>
             <div class="p-2 min-h-[40px] flex flex-col">
                 ${effectsHtml}
@@ -626,6 +661,17 @@ window.handleStepDrop = (e, targetStepIdx) => {
 window.deleteEffect = (stepIdx, effIdx) => {
     if (confirm("Xóa hiệu ứng này?")) {
         window.player.steps[stepIdx].splice(effIdx, 1);
+        renderStepsUI();
+    }
+};
+
+window.deleteStep = (stepIdx) => {
+    if (confirm(`Xóa toàn bộ Step ${stepIdx + 1}?`)) {
+        window.player.steps.splice(stepIdx, 1);
+        // Adjust currentStep if needed
+        if (window.player.currentStep > window.player.steps.length) {
+            window.player.currentStep = window.player.steps.length;
+        }
         renderStepsUI();
     }
 };
@@ -788,7 +834,8 @@ class MathAnimPlayer {
                 group: group, 
                 obj: obj,
                 originalStroke: attrs.stroke,
-                originalFill: attrs.fill
+                originalFill: attrs.fill,
+                originalStrokeWidth: attrs["stroke-width"] || "2"
             };
         });
     }
@@ -869,7 +916,7 @@ class MathAnimPlayer {
     }
 
     jumpToStep(targetStep) {
-        // [HARD RESET]: Trả toàn bộ SVG về trạng thái nguyên bản (Frame 0)
+        // [BƯỚC 1: HARD RESET] Trả toàn bộ SVG về trạng thái nguyên bản (Frame 0)
         const points0 = (this.frames && this.frames.length > 0) ? this.frames[0].points : {};
         
         Object.values(this.svgElements).forEach(item => {
@@ -882,12 +929,15 @@ class MathAnimPlayer {
                 item.dom.style.strokeDasharray = "none"; 
                 item.dom.style.strokeDashoffset = "0";
                 item.dom.style.stroke = item.originalStroke || "#333";
-                // Lấy fill ưu tiên từ data-origin-fill nếu có
+                item.dom.setAttribute("stroke-width", item.originalStrokeWidth || "2");
+                item.dom.style.transition = "none"; // Reset transition
+                
+                // Khôi phục Fill màu gốc
                 const fillFromAttr = item.dom.getAttribute('data-origin-fill');
                 item.dom.setAttribute("fill", fillFromAttr || item.originalFill || "none");
             }
             
-            // 3. Reset Tọa độ về Frame 0
+            // 3. Reset Tọa độ & Hình dáng về Frame 0
             if (obj.type === "draw_circle") {
                 const center = points0[obj.center] || { x: 0, y: 0 };
                 item.dom.setAttribute("cx", this.transformX(center.x));
@@ -904,18 +954,18 @@ class MathAnimPlayer {
                 if (obj.close_path) d += "Z";
                 item.dom.setAttribute("d", d);
             } else {
-                // Các node chữ/điểm phức tạp
+                // Object phức tạp (điểm, chữ, label)
                 this.updateComplexObject(obj, item.group, points0);
             }
         });
         
-        // [FAST-FORWARD]: Chạy logic áp dụng nhanh các hiệu ứng đến Step mục tiêu
+        // [BƯỚC 2: FAST-FORWARD] Áp dụng nhanh các hiệu ứng đến Step mục tiêu
         for(let i=0; i<targetStep; i++) {
             const effects = this.steps[i];
             if (!effects) continue;
             effects.forEach(eff => {
                 this._initEffectState(eff);
-                this._applyEffectTick(eff, 1.0); // 100% progress
+                this._applyEffectTick(eff, 1.0); // Chạy 100% progress ngay
                 this._cleanupEffect(eff);
             });
         }
@@ -1022,33 +1072,67 @@ class MathAnimPlayer {
                 }
             }
         }
-        else if (eff.type === "move" && this.frames.length > 0) {
-            // progress 0->1 mapped to frame index
-            const fIndex = Math.min(Math.floor(progress * this.frames.length), this.frames.length - 1);
-            const pts = this.frames[fIndex].points;
+        else if (eff.type === "change_style") {
+            // Apply only once to trigger CSS transition
+            if (progress > 0 && !eff._styleApplied) {
+                item.dom.style.transition = `all ${eff.duration}ms ease-in-out`;
+                if (eff.color) item.dom.style.stroke = eff.color;
+                if (eff.params) {
+                    if (eff.params.dashed) item.dom.style.strokeDasharray = eff.params.dashed;
+                    if (eff.params.strokeWidth) item.dom.setAttribute("stroke-width", eff.params.strokeWidth);
+                    if (eff.params.fill) item.dom.setAttribute("fill", eff.params.fill);
+                }
+                eff._styleApplied = true;
+            }
+        }
+        else if (eff.type === "time_shift" && this.frames.length > 0) {
+            let tStart = (eff.params && eff.params.t_start !== undefined) ? eff.params.t_start : 0.0;
+            let tEnd = (eff.params && eff.params.t_end !== undefined) ? eff.params.t_end : 1.0;
+            const currentT = tStart + progress * (tEnd - tStart);
             
-            // Rebuild/Update attributes based on obj type
-            if (item.obj.type === "draw_circle") {
-                const c = pts[item.obj.center] || {x:0, y:0};
-                item.dom.setAttribute("cx", this.transformX(c.x));
-                item.dom.setAttribute("cy", this.transformY(c.y));
-            }
-            else if (item.obj.type === "draw_lines") {
-                const mappedPts = item.obj.points.map(pName => pts[pName] || {x:0, y:0});
-                let d = "";
-                mappedPts.forEach((p, idx) => {
-                    const mappedX = this.transformX(p.x);
-                    const mappedY = this.transformY(p.y);
-                    if (idx === 0) d += `M ${mappedX} ${mappedY} `;
-                    else d += `L ${mappedX} ${mappedY} `;
-                });
-                if (item.obj.close_path) d += "Z";
-                item.dom.setAttribute("d", d);
-            }
-            else {
-                // Complex objects -> clear group and update
-                this.updateComplexObject(item.obj, item.group, pts);
-            }
+            const totalFrames = this.frames.length;
+            let fIndex = Math.round(currentT * (totalFrames - 1));
+            fIndex = Math.max(0, Math.min(fIndex, totalFrames - 1));
+            const currentPts = this.frames[fIndex].points;
+            
+            // Duyệt TẤT CẢ visualObjects để đồng bộ tọa độ
+            this.visualObjects.forEach(obj => {
+                const subItem = this.svgElements[obj._id];
+                if (!subItem || !subItem.dom) return;
+                
+                // Tắt transition khi đang dịch chuyển để mượt
+                if (subItem.dom.style.transition && subItem.dom.style.transition !== "none") {
+                    subItem.dom.style.transition = "none";
+                }
+
+                if (obj.type === "draw_circle") {
+                    const c = currentPts[obj.center] || {x:0, y:0};
+                    subItem.dom.setAttribute("cx", this.transformX(c.x));
+                    subItem.dom.setAttribute("cy", this.transformY(c.y));
+                }
+                else if (obj.type === "draw_line" || obj.type === "draw_lines") {
+                    if (obj.type === "draw_line") {
+                        const p1 = currentPts[obj.p1] || {x:0, y:0};
+                        const p2 = currentPts[obj.p2] || {x:0, y:0};
+                        subItem.dom.setAttribute("x1", this.transformX(p1.x));
+                        subItem.dom.setAttribute("y1", this.transformY(p1.y));
+                        subItem.dom.setAttribute("x2", this.transformX(p2.x));
+                        subItem.dom.setAttribute("y2", this.transformY(p2.y));
+                    } else {
+                        const mappedPts = obj.points.map(pName => currentPts[pName] || {x:0, y:0});
+                        let d = "";
+                        mappedPts.forEach((p, idx) => {
+                            if (idx === 0) d += `M ${this.transformX(p.x)} ${this.transformY(p.y)} `;
+                            else d += `L ${this.transformX(p.x)} ${this.transformY(p.y)} `;
+                        });
+                        if (obj.close_path) d += "Z";
+                        subItem.dom.setAttribute("d", d);
+                    }
+                }
+                else if (["fill_node", "node_label", "draw_line_label"].includes(obj.type)) {
+                    this.updateComplexObject(obj, subItem.group, currentPts);
+                }
+            });
         }
     }
 
@@ -1061,6 +1145,10 @@ class MathAnimPlayer {
             let makeSolid = true;
             if (eff.params && eff.params.keepDashed) makeSolid = false;
             if (makeSolid && item.dom) item.dom.style.strokeDasharray = "none";
+        }
+        if (eff.type === "change_style") {
+            if (item.dom) item.dom.style.transition = "none";
+            eff._styleApplied = false;
         }
         if (eff.spark) {
             eff.spark.remove();

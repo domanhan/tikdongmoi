@@ -20,9 +20,9 @@ from typing import Any, Dict, List, Optional
 # ---------------------------------------------------------------------------
 # Kiểu dữ liệu trung gian
 # ---------------------------------------------------------------------------
-Point2D = Dict[str, float]          # {"x": float, "y": float}
-PointMap = Dict[str, Point2D]       # {"O": {"x":0, "y":0}, ...}
-Frame = Dict[str, Any]              # {"frame_index": int, "t_value": float, "points": PointMap}
+Point2D = Dict[str, float]  # {"x": float, "y": float}
+PointMap = Dict[str, Point2D]  # {"O": {"x":0, "y":0}, ...}
+Frame = Dict[str, Any]  # {"frame_index": int, "t_value": float, "points": PointMap}
 
 
 # ---------------------------------------------------------------------------
@@ -86,12 +86,16 @@ class MathEngine:
             for node in math_ast:
                 self._process_node(node, current_points, vars_table)
 
-            frames.append({
-                "frame_index": i,
-                "t_value": round(t_current, 6),
-                "points": {k: {"x": round(v["x"], 6), "y": round(v["y"], 6)}
-                           for k, v in current_points.items()},
-            })
+            frames.append(
+                {
+                    "frame_index": i,
+                    "t_value": round(t_current, 6),
+                    "points": {
+                        k: {"x": round(v["x"], 6), "y": round(v["y"], 6)}
+                        for k, v in current_points.items()
+                    },
+                }
+            )
 
         return frames
 
@@ -109,12 +113,13 @@ class MathEngine:
         node_type: str = node.get("type", "")
 
         handlers = {
-            "point_absolute":      self._handle_point_absolute,
-            "point_polar":         self._handle_point_polar,
-            "point_project":       self._handle_point_project,
-            "point_interpolate":   self._handle_point_interpolate,
+            "point_absolute": self._handle_point_absolute,
+            "point_polar": self._handle_point_polar,
+            "point_project": self._handle_point_project,
+            "point_interpolate": self._handle_point_interpolate,
             "point_line_intersect": self._handle_point_line_intersect,
-            "point_calc":          self._handle_point_calc,
+            "point_calc": self._handle_point_calc,
+            "point_rotate_interpolate": self._handle_point_rotate_interpolate,
             # def_time, named_path, intersection, visual → bỏ qua
         }
 
@@ -159,7 +164,7 @@ class MathEngine:
             return
 
         angle_deg = self._safe_eval(str(node["angle"]), vars_table)
-        radius    = self._safe_eval(str(node["radius"]), vars_table)
+        radius = self._safe_eval(str(node["radius"]), vars_table)
 
         angle_rad = math.radians(angle_deg)
         x = center["x"] + radius * math.cos(angle_rad)
@@ -185,7 +190,7 @@ class MathEngine:
           H(x) = A.x + k * AB.x
           H(y) = A.y + k * AB.y
         """
-        pid   = node["id"]
+        pid = node["id"]
         p_key = node["point"]
         a_key = node["line_p1"]
         b_key = node["line_p2"]
@@ -229,15 +234,48 @@ class MathEngine:
         k = 1   → P trùng C
         k có thể là biểu thức chứa biến t.
         """
-        pid  = node["id"]
-        p1   = points.get(node["p1"])
-        p2   = points.get(node["p2"])
+        pid = node["id"]
+        p1 = points.get(node["p1"])
+        p2 = points.get(node["p2"])
         if p1 is None or p2 is None:
             return
 
         k = self._safe_eval(str(node["k"]), vars_table)
         x = p1["x"] + k * (p2["x"] - p1["x"])
         y = p1["y"] + k * (p2["y"] - p1["y"])
+        points[pid] = {"x": x, "y": y}
+
+    def _handle_point_rotate_interpolate(
+        self,
+        node: Dict[str, Any],
+        points: PointMap,
+        vars_table: Dict[str, float],
+    ) -> None:
+        """
+        Nội suy xoay: $(A)!k!angle:(C)$
+        1. Nội suy: P = A + k*(C - A)
+        2. Xoay P quanh A một góc 'angle' (độ)
+        """
+        pid = node["id"]
+        p1 = points.get(node["p1"])
+        p2 = points.get(node["p2"])
+        if p1 is None or p2 is None:
+            return
+
+        k = self._safe_eval(str(node["k"]), vars_table)
+        angle_deg = self._safe_eval(str(node["angle"]), vars_table)
+        angle_rad = math.radians(angle_deg)
+
+        # Bước 1: Nội suy
+        ix = p1["x"] + k * (p2["x"] - p1["x"])
+        iy = p1["y"] + k * (p2["y"] - p1["y"])
+
+        # Bước 2: Xoay quanh p1
+        dx = ix - p1["x"]
+        dy = iy - p1["y"]
+        x = p1["x"] + dx * math.cos(angle_rad) - dy * math.sin(angle_rad)
+        y = p1["y"] + dx * math.sin(angle_rad) + dy * math.cos(angle_rad)
+
         points[pid] = {"x": x, "y": y}
 
     def _handle_point_line_intersect(
@@ -258,11 +296,11 @@ class MathEngine:
           t   = (C-A) × (D-C) / det
           E   = A + t*(B-A)
         """
-        pid  = node["id"]
-        A    = points.get(node["l1p1"])
-        B    = points.get(node["l1p2"])
-        C    = points.get(node["l2p1"])
-        D    = points.get(node["l2p2"])
+        pid = node["id"]
+        A = points.get(node["l1p1"])
+        B = points.get(node["l1p2"])
+        C = points.get(node["l2p1"])
+        D = points.get(node["l2p2"])
         if None in (A, B, C, D):
             return
 
@@ -293,13 +331,13 @@ class MathEngine:
           - Nhận diện các token (POINT_NAME) và toán tử +/-
           - Áp dụng tuần tự từ trái sang phải
         """
-        pid  = node["id"]
+        pid = node["id"]
         expr = node["expr"].strip()
 
         # Tách thành danh sách (operator, point_name)
         # Ví dụ: "(B)-(A)+(D)" → [('+','B'), ('-','A'), ('+','D')]
-        token_re = re.compile(r'([+\-]?)\s*\(([^)]+)\)')
-        tokens   = token_re.findall(expr)
+        token_re = re.compile(r"([+\-]?)\s*\(([^)]+)\)")
+        tokens = token_re.findall(expr)
 
         rx, ry = 0.0, 0.0
         for op, pt_name in tokens:
@@ -382,6 +420,7 @@ class MathEngine:
 if __name__ == "__main__":
     import json
     import sys
+
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     # Bộ math_ast mẫu:
@@ -389,14 +428,24 @@ if __name__ == "__main__":
     #   - D quay quanh O theo góc 360*t, bán kính 2
     #   - H là hình chiếu vuông góc của D lên trục Ox (A→B)
     sample_ast = [
-        {"type": "def_time",       "var": "t",  "value": "0"},
-        {"type": "point_absolute", "id": "O",   "x": "0",     "y": "0"},
-        {"type": "point_absolute", "id": "A",   "x": "3",     "y": "0"},
-        {"type": "point_absolute", "id": "B",   "x": "-3",    "y": "0"},   # trục Ox
-        {"type": "point_polar",    "id": "D",
-         "center": "O", "angle": "360*t", "radius": "2"},
-        {"type": "point_project",  "id": "H",
-         "point": "D", "line_p1": "A", "line_p2": "B"},
+        {"type": "def_time", "var": "t", "value": "0"},
+        {"type": "point_absolute", "id": "O", "x": "0", "y": "0"},
+        {"type": "point_absolute", "id": "A", "x": "3", "y": "0"},
+        {"type": "point_absolute", "id": "B", "x": "-3", "y": "0"},  # trục Ox
+        {
+            "type": "point_polar",
+            "id": "D",
+            "center": "O",
+            "angle": "360*t",
+            "radius": "2",
+        },
+        {
+            "type": "point_project",
+            "id": "H",
+            "point": "D",
+            "line_p1": "A",
+            "line_p2": "B",
+        },
     ]
 
     engine = MathEngine()
@@ -405,7 +454,7 @@ if __name__ == "__main__":
         param_name="t",
         t_min=0.0,
         t_max=1.0,
-        total_frames=5,      # Chỉ 5 frame để dễ đọc
+        total_frames=5,  # Chỉ 5 frame để dễ đọc
     )
 
     print("=" * 60)

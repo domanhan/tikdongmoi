@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathAnim Export AutoPlay</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #fff; }
+        #canvas-container { width: 100%; height: 100%; position: relative; background: #fff; }
+        
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <div id="canvas-container"></div>
+    
+
+
+    <!-- Data stored safely as JSON block to avoid execution/escaping issues -->
+    <script type="application/json" id="mathanim-data">
+{"visual_objects":[{"type":"draw_circle","options":"","center":"O","radius":"2","_id":"obj_0","_src":"\\draw (O) circle (2);"},{"type":"draw_lines","options":"","points":["A","B","C"],"close_path":true,"_id":"obj_1","_src":"\\draw (A)--(B)--(C)--cycle;"},{"type":"fill_node","fill_options":"","point":"A","node_options":"above","label":"$A$","_id":"obj_2","_src":"\\fill (A) circle (1pt) node[above]{$A$};"},{"type":"draw_lines","options":"","points":["A","M","B"],"close_path":false,"_id":"obj_3","_src":"\\draw (A)--(M)--(B);"},{"type":"draw_lines","options":"","points":["A","O","B"],"close_path":false,"_id":"obj_4","_src":"\\draw (A)--(O)--(B);"},{"type":"draw_lines","options":"","points":["O","M"],"close_path":false,"_id":"obj_5","_src":"\\draw (O)--(M);"},{"type":"draw_right_angle","options":"draw,angle radius =2mm","p1":"O","vertex":"A","p2":"M","_id":"obj_6","_src":"\\draw pic[draw,angle radius =2mm]{right angle = O--A--M};"},{"type":"draw_right_angle","options":"draw,angle radius =2mm","p1":"M","vertex":"B","p2":"O","_id":"obj_7","_src":"\\draw pic[draw,angle radius =2mm]{right angle = M--B--O};"}],"frames":[{"frame_index":0,"t_value":30,"points":{"O":{"x":0,"y":0},"A":{"x":1.732051,"y":1},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.832051,"y":0.826795},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.57115,"y":-0.453363}}},{"frame_index":1,"t_value":30.508475,"points":{"O":{"x":0,"y":0},"A":{"x":1.723108,"y":1.015332},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.824641,"y":0.843021},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.582779,"y":-0.443606}}},{"frame_index":2,"t_value":31.016949,"points":{"O":{"x":0,"y":0},"A":{"x":1.71403,"y":1.030583},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.817088,"y":0.85918},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.594495,"y":-0.433775}}},{"frame_index":3,"t_value":31.525424,"points":{"O":{"x":0,"y":0},"A":{"x":1.704816,"y":1.045754},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.809392,"y":0.875272},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.6063,"y":-0.423869}}},{"frame_index":4,"t_value":32.033898,"points":{"O":{"x":0,"y":0},"A":{"x":1.695469,"y":1.060842},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.801553,"y":0.891295},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.618196,"y":-0.413888}}},{"frame_index":5,"t_value":32.542373,"points":{"O":{"x":0,"y":0},"A":{"x":1.685988,"y":1.075846},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.793572,"y":0.907248},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.630184,"y":-0.403828}}},{"frame_index":6,"t_value":33.050847,"points":{"O":{"x":0,"y":0},"A":{"x":1.676374,"y":1.090766},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.78545,"y":0.923129},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.642265,"y":-0.393691}}},{"frame_index":7,"t_value":33.559322,"points":{"O":{"x":0,"y":0},"A":{"x":1.666628,"y":1.1056},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.777188,"y":0.938937},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.654442,"y":-0.383473}}},{"frame_index":8,"t_value":34.067797,"points":{"O":{"x":0,"y":0},"A":{"x":1.656751,"y":1.120347},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.768785,"y":0.954672},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.666716,"y":-0.373174}}},{"frame_index":9,"t_value":34.576271,"points":{"O":{"x":0,"y":0},"A":{"x":1.646743,"y":1.135006},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.760243,"y":0.970331},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.679089,"y":-0.362792}}},{"frame_index":10,"t_value":35.084746,"points":{"O":{"x":0,"y":0},"A":{"x":1.636606,"y":1.149575},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.751563,"y":0.985914},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.691562,"y":-0.352326}}},{"frame_index":11,"t_value":35.59322,"points":{"O":{"x":0,"y":0},"A":{"x":1.626339,"y":1.164054},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.742745,"y":1.00142},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.704137,"y":-0.341774}}},{"frame_index":12,"t_value":36.101695,"points":{"O":{"x":0,"y":0},"A":{"x":1.615945,"y":1.178441},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.733789,"y":1.016846},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.716815,"y":-0.331136}}},{"frame_index":13,"t_value":36.610169,"points":{"O":{"x":0,"y":0},"A":{"x":1.605423,"y":1.192735},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.724697,"y":1.032192},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.729599,"y":-0.320409}}},{"frame_index":14,"t_value":37.118644,"points":{"O":{"x":0,"y":0},"A":{"x":1.594775,"y":1.206935},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.715469,"y":1.047457},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.742491,"y":-0.309591}}},{"frame_index":15,"t_value":37.627119,"points":{"O":{"x":0,"y":0},"A":{"x":1.584002,"y":1.22104},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.706106,"y":1.06264},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.755492,"y":-0.298682}}},{"frame_index":16,"t_value":38.135593,"points":{"O":{"x":0,"y":0},"A":{"x":1.573103,"y":1.235049},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.696608,"y":1.077739},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.768604,"y":-0.28768}}},{"frame_index":17,"t_value":38.644068,"points":{"O":{"x":0,"y":0},"A":{"x":1.562081,"y":1.248961},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.686977,"y":1.092753},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.781829,"y":-0.276583}}},{"frame_index":18,"t_value":39.152542,"points":{"O":{"x":0,"y":0},"A":{"x":1.550935,"y":1.262774},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.677213,"y":1.107681},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.795169,"y":-0.265389}}},{"frame_index":19,"t_value":39.661017,"points":{"O":{"x":0,"y":0},"A":{"x":1.539668,"y":1.276488},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.667317,"y":1.122522},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.808626,"y":-0.254097}}},{"frame_index":20,"t_value":40.169492,"points":{"O":{"x":0,"y":0},"A":{"x":1.528279,"y":1.290102},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.657289,"y":1.137274},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.822203,"y":-0.242705}}},{"frame_index":21,"t_value":40.677966,"points":{"O":{"x":0,"y":0},"A":{"x":1.51677,"y":1.303614},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.647131,"y":1.151937},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.835901,"y":-0.231211}}},{"frame_index":22,"t_value":41.186441,"points":{"O":{"x":0,"y":0},"A":{"x":1.505142,"y":1.317023},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.636844,"y":1.166509},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.849723,"y":-0.219613}}},{"frame_index":23,"t_value":41.694915,"points":{"O":{"x":0,"y":0},"A":{"x":1.493394,"y":1.330328},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.626427,"y":1.180989},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.86367,"y":-0.20791}}},{"frame_index":24,"t_value":42.20339,"points":{"O":{"x":0,"y":0},"A":{"x":1.48153,"y":1.343529},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.615883,"y":1.195376},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.877745,"y":-0.196099}}},{"frame_index":25,"t_value":42.711864,"points":{"O":{"x":0,"y":0},"A":{"x":1.469548,"y":1.356624},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.605211,"y":1.209669},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.891951,"y":-0.184179}}},{"frame_index":26,"t_value":43.220339,"points":{"O":{"x":0,"y":0},"A":{"x":1.457451,"y":1.369612},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.594412,"y":1.223867},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.90629,"y":-0.172148}}},{"frame_index":27,"t_value":43.728814,"points":{"O":{"x":0,"y":0},"A":{"x":1.445239,"y":1.382492},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.583488,"y":1.237968},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.920764,"y":-0.160003}}},{"frame_index":28,"t_value":44.237288,"points":{"O":{"x":0,"y":0},"A":{"x":1.432913,"y":1.395263},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.57244,"y":1.251972},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.935375,"y":-0.147742}}},{"frame_index":29,"t_value":44.745763,"points":{"O":{"x":0,"y":0},"A":{"x":1.420475,"y":1.407924},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.561267,"y":1.265877},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.950127,"y":-0.135364}}},{"frame_index":30,"t_value":45.254237,"points":{"O":{"x":0,"y":0},"A":{"x":1.407924,"y":1.420475},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.549972,"y":1.279682},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.965022,"y":-0.122865}}},{"frame_index":31,"t_value":45.762712,"points":{"O":{"x":0,"y":0},"A":{"x":1.395263,"y":1.432913},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.538554,"y":1.293387},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.980063,"y":-0.110245}}},{"frame_index":32,"t_value":46.271186,"points":{"O":{"x":0,"y":0},"A":{"x":1.382492,"y":1.445239},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.527016,"y":1.30699},"b":{"x":1.438784,"y":-1.403531},"M":{"x":2.995252,"y":-0.0975}}},{"frame_index":33,"t_value":46.779661,"points":{"O":{"x":0,"y":0},"A":{"x":1.369612,"y":1.457451},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.515357,"y":1.32049},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.010592,"y":-0.084628}}},{"frame_index":34,"t_value":47.288136,"points":{"O":{"x":0,"y":0},"A":{"x":1.356624,"y":1.469548},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.503579,"y":1.333886},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.026086,"y":-0.071627}}},{"frame_index":35,"t_value":47.79661,"points":{"O":{"x":0,"y":0},"A":{"x":1.343529,"y":1.48153},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.491682,"y":1.347177},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.041737,"y":-0.058494}}},{"frame_index":36,"t_value":48.305085,"points":{"O":{"x":0,"y":0},"A":{"x":1.330328,"y":1.493394},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.479668,"y":1.360362},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.057548,"y":-0.045227}}},{"frame_index":37,"t_value":48.813559,"points":{"O":{"x":0,"y":0},"A":{"x":1.317023,"y":1.505142},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.467537,"y":1.373439},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.073522,"y":-0.031823}}},{"frame_index":38,"t_value":49.322034,"points":{"O":{"x":0,"y":0},"A":{"x":1.303614,"y":1.51677},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.455291,"y":1.386409},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.089663,"y":-0.01828}}},{"frame_index":39,"t_value":49.830508,"points":{"O":{"x":0,"y":0},"A":{"x":1.290102,"y":1.528279},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.44293,"y":1.399269},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.105973,"y":-0.004594}}},{"frame_index":40,"t_value":50.338983,"points":{"O":{"x":0,"y":0},"A":{"x":1.276488,"y":1.539668},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.430455,"y":1.412019},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.122456,"y":0.009237}}},{"frame_index":41,"t_value":50.847458,"points":{"O":{"x":0,"y":0},"A":{"x":1.262774,"y":1.550935},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.417868,"y":1.424658},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.139115,"y":0.023216}}},{"frame_index":42,"t_value":51.355932,"points":{"O":{"x":0,"y":0},"A":{"x":1.248961,"y":1.562081},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.405169,"y":1.437185},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.155954,"y":0.037345}}},{"frame_index":43,"t_value":51.864407,"points":{"O":{"x":0,"y":0},"A":{"x":1.235049,"y":1.573103},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.39236,"y":1.449598},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.172977,"y":0.051629}}},{"frame_index":44,"t_value":52.372881,"points":{"O":{"x":0,"y":0},"A":{"x":1.22104,"y":1.584002},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.37944,"y":1.461898},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.190186,"y":0.06607}}},{"frame_index":45,"t_value":52.881356,"points":{"O":{"x":0,"y":0},"A":{"x":1.206935,"y":1.594775},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.366413,"y":1.474082},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.207587,"y":0.08067}}},{"frame_index":46,"t_value":53.389831,"points":{"O":{"x":0,"y":0},"A":{"x":1.192735,"y":1.605423},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.353277,"y":1.48615},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.225182,"y":0.095435}}},{"frame_index":47,"t_value":53.898305,"points":{"O":{"x":0,"y":0},"A":{"x":1.178441,"y":1.615945},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.340035,"y":1.498101},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.242977,"y":0.110366}}},{"frame_index":48,"t_value":54.40678,"points":{"O":{"x":0,"y":0},"A":{"x":1.164054,"y":1.626339},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.326687,"y":1.509934},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.260974,"y":0.125467}}},{"frame_index":49,"t_value":54.915254,"points":{"O":{"x":0,"y":0},"A":{"x":1.149575,"y":1.636606},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.313235,"y":1.521648},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.279178,"y":0.140742}}},{"frame_index":50,"t_value":55.423729,"points":{"O":{"x":0,"y":0},"A":{"x":1.135006,"y":1.646743},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.29968,"y":1.533242},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.297594,"y":0.156195}}},{"frame_index":51,"t_value":55.932203,"points":{"O":{"x":0,"y":0},"A":{"x":1.120347,"y":1.656751},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.286022,"y":1.544716},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.316225,"y":0.171829}}},{"frame_index":52,"t_value":56.440678,"points":{"O":{"x":0,"y":0},"A":{"x":1.1056,"y":1.666628},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.272263,"y":1.556068},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.335077,"y":0.187647}}},{"frame_index":53,"t_value":56.949153,"points":{"O":{"x":0,"y":0},"A":{"x":1.090766,"y":1.676374},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.258404,"y":1.567297},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.354154,"y":0.203655}}},{"frame_index":54,"t_value":57.457627,"points":{"O":{"x":0,"y":0},"A":{"x":1.075846,"y":1.685988},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.244445,"y":1.578403},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.373461,"y":0.219856}}},{"frame_index":55,"t_value":57.966102,"points":{"O":{"x":0,"y":0},"A":{"x":1.060842,"y":1.695469},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.230389,"y":1.589385},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.393003,"y":0.236253}}},{"frame_index":56,"t_value":58.474576,"points":{"O":{"x":0,"y":0},"A":{"x":1.045754,"y":1.704816},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.216235,"y":1.600241},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.412785,"y":0.252852}}},{"frame_index":57,"t_value":58.983051,"points":{"O":{"x":0,"y":0},"A":{"x":1.030583,"y":1.71403},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.201986,"y":1.610971},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.432813,"y":0.269657}}},{"frame_index":58,"t_value":59.491525,"points":{"O":{"x":0,"y":0},"A":{"x":1.015332,"y":1.723108},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.187642,"y":1.621575},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.453091,"y":0.286673}}},{"frame_index":59,"t_value":60,"points":{"O":{"x":0,"y":0},"A":{"x":1,"y":1.732051},"B":{"x":1.285575,"y":-1.532089},"C":{"x":-1.732051,"y":-1},"a":{"x":1.173205,"y":1.632051},"b":{"x":1.438784,"y":-1.403531},"M":{"x":3.473625,"y":0.303903}}}],"steps":[[{"target_id":"obj_0","type":"draw_light","duration":1500,"length":632.3035278320312,"spark":{},"sparkCoreConfig":{"color":"#eab308"}}],[{"target_id":"obj_1","type":"draw","duration":1000,"length":515.2244873046875}],[{"target_id":"obj_2","type":"fade_in","duration":600}],[{"target_id":"obj_3","type":"draw","duration":1000,"length":172.8199005126953}],[{"target_id":"obj_4","type":"draw","duration":1000,"length":205.00003051757812}],[{"target_id":"obj_5","type":"draw","duration":1000,"length":135.5406951904297}],[{"target_id":"obj_6","type":"draw","duration":800,"length":19.99999237060547}],[{"target_id":"obj_7","type":"draw","duration":800,"length":20.000006675720215}],[{"target_id":"obj_2","type":"time_shift","duration":3000}]]}
+    </script>
+
+    <script>
+        const SCALE = 50;
+
+        // Class definition injected natively
+        class MathAnimPlayer {
+    constructor(container) {
+        this.container = container;
+        this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        this.svg.setAttribute("width", "100%");
+        this.svg.setAttribute("height", "100%");
+        this.svg.style.position = "absolute";
+        this.svg.style.top = "0";
+        this.svg.style.left = "0";
+        
+        this.container.innerHTML = "";
+        this.container.appendChild(this.svg);
+        
+        // State
+        this.visualObjects = [];
+        this.frames = [];
+        this.svgElements = {}; // Mapping visual_obj._id -> { dom, group }
+        
+        this.steps = []; // Array of Arrays of effects
+        this.currentStep = -1;
+        this.isPlaying = false;
+        this.isStopRequested = false;
+        this.animationFrameId = null;
+        
+        // Effect layers
+        this.glowLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        this.svg.appendChild(this.glowLayer);
+    }
+
+    transformX(mathX) { return this.container.clientWidth / 2 + mathX * SCALE; }
+    transformY(mathY) { return this.container.clientHeight / 2 - mathY * SCALE; }
+
+    init(visualObjects, frames, steps) {
+        this.visualObjects = visualObjects;
+        this.frames = frames;
+        this.steps = steps || [];
+        
+        // Clear SVG but keep layers order
+        this.svg.innerHTML = "";
+        const mainLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        this.glowLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        this.svg.appendChild(mainLayer);
+        this.svg.appendChild(this.glowLayer);
+
+        this.svgElements = {};
+        const points0 = frames.length > 0 ? frames[0].points : {};
+        const getPt = (name) => points0[name] || { x: 0, y: 0 };
+
+        const parseOpts = (optStr) => {
+            const attrs = { stroke: "#333", "stroke-width": "2", fill: "none" };
+            if (!optStr) return attrs;
+            if (optStr.includes("blue")) attrs.stroke = "#3b82f6";
+            if (optStr.includes("red")) attrs.stroke = "#ef4444";
+            if (optStr.includes("green")) attrs.stroke = "#22c55e";
+            if (optStr.includes("black")) attrs.stroke = "#000000";
+            if (optStr.includes("thick")) attrs["stroke-width"] = "3";
+            if (optStr.includes("dashed")) attrs["stroke-dasharray"] = "5,5";
+            return attrs;
+        };
+
+        // Instantiate elements hidden (opacity 0)
+        this.visualObjects.forEach(obj => {
+            let dom = null;
+            let isText = false;
+            let group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            group.style.opacity = "0"; // All hidden by default
+
+            if (obj.type === "draw_circle") {
+                const center = getPt(obj.center);
+                let r = parseFloat(obj.radius) || 1;
+                dom = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                dom.setAttribute("cx", this.transformX(center.x));
+                dom.setAttribute("cy", this.transformY(center.y));
+                dom.setAttribute("r", r * SCALE);
+                const attrs = parseOpts(obj.options);
+                for (let k in attrs) dom.setAttribute(k, attrs[k]);
+                group.appendChild(dom);
+            }
+            else if (obj.type === "draw_lines") {
+                const pts = obj.points.map(pName => getPt(pName));
+                let d = "";
+                pts.forEach((p, idx) => {
+                    const mappedX = this.transformX(p.x);
+                    const mappedY = this.transformY(p.y);
+                    if (idx === 0) d += `M ${mappedX} ${mappedY} `;
+                    else d += `L ${mappedX} ${mappedY} `;
+                });
+                if (obj.close_path) d += "Z";
+                
+                dom = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                dom.setAttribute("d", d);
+                const attrs = parseOpts(obj.options);
+                // default if not specified
+                if (!attrs.fill && obj.close_path) attrs.fill = "none"; 
+                for (let k in attrs) dom.setAttribute(k, attrs[k]);
+                group.appendChild(dom);
+            }
+            else if (obj.type === "draw_line") {
+                const p1 = getPt(obj.p1);
+                const p2 = getPt(obj.p2);
+                dom = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                dom.setAttribute("x1", this.transformX(p1.x));
+                dom.setAttribute("y1", this.transformY(p1.y));
+                dom.setAttribute("x2", this.transformX(p2.x));
+                dom.setAttribute("y2", this.transformY(p2.y));
+                const attrs = parseOpts(obj.options);
+                for (let k in attrs) dom.setAttribute(k, attrs[k]);
+                group.appendChild(dom);
+            }
+            else if (obj.type === "fill_node" || obj.type === "node_label" || obj.type === "draw_line_label") {
+                // Complex objects treated as grouped
+                this.updateComplexObject(obj, group, points0);
+                dom = group; 
+            }
+            else if (obj.type === "draw_right_angle" || obj.type === "draw_angle") {
+                // Góc vuông / góc thường - vẽ path hình chữ L nhỏ
+                const p1 = getPt(obj.p1);
+                const vertex = getPt(obj.vertex);
+                const p2 = getPt(obj.p2);
+                
+                const size = 2; // 2mm ≈ 0.15 unit, dùng fixed 0.15
+                const angleSize = 0.15;
+                
+                // Vector từ vertex đến p1 và p2
+                const v1x = p1.x - vertex.x, v1y = p1.y - vertex.y;
+                const v2x = p2.x - vertex.x, v2y = p2.y - vertex.y;
+                const len1 = Math.sqrt(v1x*v1x + v1y*v1y) || 1;
+                const len2 = Math.sqrt(v2x*v2x + v2y*v2y) || 1;
+                
+                // Điểm trên 2 cạnh cách vertex một khoảng angleSize
+                const ax = vertex.x + (v1x/len1) * angleSize;
+                const ay = vertex.y + (v1y/len1) * angleSize;
+                const bx = vertex.x + (v2x/len2) * angleSize;
+                const by = vertex.y + (v2y/len2) * angleSize;
+                
+                // Điểm góc vuông
+                const cx = ax + (bx - vertex.x);
+                const cy = ay + (by - vertex.y);
+                
+                const d = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
+                dom = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                dom.setAttribute("d", d);
+                dom.setAttribute("fill", "none");
+                dom.setAttribute("stroke", "#333");
+                dom.setAttribute("stroke-width", "1");
+                group.appendChild(dom);
+            }
+            
+            if (obj.type !== "fill_node" && obj.type !== "node_label" && obj.type !== "draw_line_label") {
+                // simple elements cache
+            }
+
+            mainLayer.appendChild(group);
+            const attrs = parseOpts(obj.options);
+            this.svgElements[obj._id] = { 
+                dom: dom, 
+                group: group, 
+                obj: obj,
+                originalStroke: attrs.stroke,
+                originalFill: attrs.fill,
+                originalStrokeWidth: attrs["stroke-width"] || "2"
+            };
+        });
+    }
+
+    addEffect(step, target_id, effect_type, duration) {
+        if (step > 0 && step <= this.steps.length) {
+            this.steps[step-1].push({ target_id, type: effect_type, duration });
+        }
+    }
+
+    playStep(stepNum, onComplete) {
+        if (this.isPlaying || stepNum < 1 || stepNum > this.steps.length) {
+            if (onComplete) onComplete();
+            return;
+        }
+        this.isPlaying = true;
+        const effects = this.steps[stepNum-1];
+        if (effects.length === 0) {
+            this.isPlaying = false;
+            if (onComplete) onComplete();
+            return;
+        }
+
+        const startTime = performance.now();
+        const maxDuration = Math.max(...effects.map(e => e.duration));
+
+        effects.forEach(eff => this._initEffectState(eff));
+
+        const animate = (time) => {
+            if (this.isStopRequested) {
+                this._finishStop(effects, onComplete);
+                return;
+            }
+
+            const elapsed = time - startTime;
+            let allDone = true;
+
+            effects.forEach(eff => {
+                let progress = Math.min(elapsed / eff.duration, 1.0);
+                // easeInOutQuad
+                let ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                
+                this._applyEffectTick(eff, ease);
+                
+                if (progress < 1.0) allDone = false;
+            });
+
+            if (!allDone) {
+                this.animationFrameId = requestAnimationFrame(animate);
+            } else {
+                this.isPlaying = false;
+                this.animationFrameId = null;
+                effects.forEach(eff => this._cleanupEffect(eff));
+                if (onComplete) onComplete();
+            }
+        };
+        this.animationFrameId = requestAnimationFrame(animate);
+    }
+
+    stop() {
+        if (this.isPlaying) {
+            this.isStopRequested = true;
+        }
+    }
+
+    _finishStop(effects, onComplete) {
+        this.isPlaying = false;
+        this.isStopRequested = false;
+        if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+        
+        effects.forEach(eff => this._cleanupEffect(eff));
+        
+        // Jump to current state to ensure valid visuals
+        this.jumpToStep(this.currentStep);
+        
+        if (onComplete) onComplete();
+    }
+
+    jumpToStep(targetStep) {
+        // [BƯỚC 1: HARD RESET] Trả toàn bộ SVG về trạng thái nguyên bản (Frame 0)
+        const points0 = (this.frames && this.frames.length > 0) ? this.frames[0].points : {};
+        
+        Object.values(this.svgElements).forEach(item => {
+            const obj = item.obj;
+            // 1. Reset Opacity
+            item.group.style.opacity = "0";
+            
+            // 2. Reset Stroke/Fill/Dash
+            if (item.dom && item.dom.style) {
+                item.dom.style.strokeDasharray = "none"; 
+                item.dom.style.strokeDashoffset = "0";
+                item.dom.style.stroke = item.originalStroke || "#333";
+                item.dom.setAttribute("stroke-width", item.originalStrokeWidth || "2");
+                item.dom.style.transition = "none"; // Reset transition
+                
+                // Khôi phục Fill màu gốc
+                const fillFromAttr = item.dom.getAttribute('data-origin-fill');
+                item.dom.setAttribute("fill", fillFromAttr || item.originalFill || "none");
+            }
+            
+            // 3. Reset Tọa độ & Hình dáng về Frame 0
+            if (obj.type === "draw_circle") {
+                const center = points0[obj.center] || { x: 0, y: 0 };
+                item.dom.setAttribute("cx", this.transformX(center.x));
+                item.dom.setAttribute("cy", this.transformY(center.y));
+            } else if (obj.type === "draw_lines") {
+                const pts = obj.points.map(pName => points0[pName] || { x: 0, y: 0 });
+                let d = "";
+                pts.forEach((p, idx) => {
+                    const mappedX = this.transformX(p.x);
+                    const mappedY = this.transformY(p.y);
+                    if (idx === 0) d += `M ${mappedX} ${mappedY} `;
+                    else d += `L ${mappedX} ${mappedY} `;
+                });
+                if (obj.close_path) d += "Z";
+                item.dom.setAttribute("d", d);
+            } else if (obj.type === "draw_line") {
+                const p1 = points0[obj.p1] || { x: 0, y: 0 };
+                const p2 = points0[obj.p2] || { x: 0, y: 0 };
+                item.dom.setAttribute("x1", this.transformX(p1.x));
+                item.dom.setAttribute("y1", this.transformY(p1.y));
+                item.dom.setAttribute("x2", this.transformX(p2.x));
+                item.dom.setAttribute("y2", this.transformY(p2.y));
+            } else {
+                // Object phức tạp (điểm, chữ, label)
+                this.updateComplexObject(obj, item.group, points0);
+            }
+        });
+        
+        // [BƯỚC 2: FAST-FORWARD] Áp dụng nhanh các hiệu ứng đến Step mục tiêu
+        for(let i=0; i<targetStep; i++) {
+            const effects = this.steps[i];
+            if (!effects) continue;
+            effects.forEach(eff => {
+                this._initEffectState(eff);
+                this._applyEffectTick(eff, 1.0); // Chạy 100% progress ngay
+                this._cleanupEffect(eff);
+            });
+        }
+        this.currentStep = targetStep;
+    }
+
+    _initEffectState(eff) {
+        const item = this.svgElements[eff.target_id];
+        if (!item) return;
+        
+        // Ensure element is visible if it's supposed to appear
+        if (eff.type === "fade_in" || eff.type === "draw" || eff.type === "draw_light" || eff.type === "draw_dashed_light") {
+            item.group.style.opacity = "1";
+        }
+        
+        if (eff.type.includes("draw") && item.dom && item.dom.getTotalLength) {
+            // Overdraw by 5 pixels to close the gap in circles or polygons
+            const baseLen = item.dom.getTotalLength();
+            const len = baseLen + 5; 
+            eff.length = len;
+            item.dom.style.strokeDasharray = len;
+            item.dom.style.strokeDashoffset = len; // Hide initially
+            
+            if (eff.type === "draw_dashed_light") {
+                item.dom.style.strokeDasharray = (eff.params && eff.params.dashed) ? eff.params.dashed : "5,10";
+            }
+            if (eff.type === "draw_light" || eff.type === "draw_dashed_light") {
+                const spark = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                const coreColor = eff.color || (eff.type === "draw_dashed_light" ? "#f97316" : "#eab308");
+                
+                const glow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                glow.setAttribute("r", "8");
+                glow.setAttribute("fill", coreColor);
+                glow.setAttribute("opacity", "0.4");
+                glow.setAttribute("filter", "drop-shadow(0 0 6px " + coreColor + ")");
+                
+                const core = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                core.setAttribute("r", "4");
+                core.setAttribute("fill", "#ffffff");
+
+                spark.appendChild(glow);
+                spark.appendChild(core);
+                this.glowLayer.appendChild(spark);
+                eff.spark = spark;
+                eff.sparkCoreConfig = { color: coreColor };
+            }
+        }
+
+        if (eff.type === "fade_in" || eff.type === "fill") {
+            item.group.style.opacity = "0";
+        }
+    }
+
+    _applyEffectTick(eff, progress) {
+        const item = this.svgElements[eff.target_id];
+        if (!item) return;
+
+        if (eff.type === "fade_in") {
+            item.group.style.opacity = progress.toString();
+        }
+        else if (eff.type === "fill") {
+            // Apply fill color from param
+            const fillColor = eff.color || "rgba(169, 177, 214, 0.5)"; // Default from reference
+            let opacity = 1.0;
+            if (eff.params && eff.params.opacity) opacity = parseFloat(eff.params.opacity);
+            item.group.style.opacity = (progress * opacity).toString();
+            
+            // if it's a circle or something we might need to set fill
+            if (item.dom) {
+                // To preserve stroke vs fill
+                if (!item.dom.getAttribute('data-origin-fill')) {
+                    item.dom.setAttribute('data-origin-fill', item.dom.getAttribute('fill') || 'none');
+                }
+                item.dom.setAttribute("fill", fillColor);
+            }
+        }
+        else if (eff.type.includes("draw") && item.dom && item.dom.getTotalLength) {
+            
+            // Apply color if requested
+            if (eff.color) item.dom.style.stroke = eff.color;
+
+            if (eff.type === "draw") {
+                item.dom.style.strokeDashoffset = eff.length * (1 - progress);
+            } else if (eff.type === "draw_light" || eff.type === "draw_dashed_light") {
+                if (eff.type === "draw_light") {
+                    item.dom.style.strokeDasharray = eff.length;
+                    item.dom.style.strokeDashoffset = eff.length * (1 - progress);
+                } else {
+                    let dashParams = (eff.params && eff.params.dashed) ? eff.params.dashed : "5,10";
+                    item.dom.style.strokeDasharray = dashParams;
+                    item.dom.style.strokeDashoffset = eff.length * (1 - progress); 
+                }
+                
+                if (eff.spark) {
+                    const pt = item.dom.getPointAtLength(eff.length * progress);
+                    eff.spark.setAttribute("transform", `translate(${pt.x}, ${pt.y})`);
+                    
+                    // Allow custom spark color
+                    if (eff.color && eff.color !== eff.sparkCoreConfig.color) {
+                        eff.spark.firstChild.setAttribute("fill", eff.color);
+                        eff.spark.firstChild.setAttribute("filter", "drop-shadow(0 0 6px " + eff.color + ")");
+                        eff.sparkCoreConfig.color = eff.color;
+                    }
+                }
+            }
+        }
+        else if (eff.type === "change_style") {
+            // Apply only once to trigger CSS transition
+            if (progress > 0 && !eff._styleApplied) {
+                item.dom.style.transition = `all ${eff.duration}ms ease-in-out`;
+                if (eff.color) item.dom.style.stroke = eff.color;
+                if (eff.params) {
+                    if (eff.params.dashed) item.dom.style.strokeDasharray = eff.params.dashed;
+                    if (eff.params.strokeWidth) item.dom.setAttribute("stroke-width", eff.params.strokeWidth);
+                    if (eff.params.fill) item.dom.setAttribute("fill", eff.params.fill);
+                }
+                eff._styleApplied = true;
+            }
+        }
+        else if (eff.type === "time_shift" && this.frames.length > 0) {
+            const totalFrames = this.frames.length;
+            let fIndex = Math.round(progress * (totalFrames - 1));
+            fIndex = Math.max(0, Math.min(fIndex, totalFrames - 1));
+            const currentPts = this.frames[fIndex].points;
+            
+            // DUYỆT QUA TẤT CẢ OBJECT ĐỂ UPDATE (hiệu ứng toàn cục)
+            this.visualObjects.forEach(obj => {
+                const subItem = this.svgElements[obj._id];
+                if (!subItem) return;
+                
+                // Set visible — time_shift cần object hiện rõ
+                subItem.group.style.opacity = "1";
+                
+                if (subItem.dom) {
+                    // Tắt CSS transition để không bị giật
+                    subItem.dom.style.transition = "none";
+                    // Xóa stroke-dash để đường luôn vẽ đầy (không bị draw effect chồng)
+                    subItem.dom.style.strokeDasharray = "none";
+                    subItem.dom.style.strokeDashoffset = "0";
+                }
+
+                // Cập nhật Hình Tròn
+                if (obj.type === "draw_circle") {
+                    const c = currentPts[obj.center] || {x:0, y:0};
+                    subItem.dom.setAttribute("cx", this.transformX(c.x));
+                    subItem.dom.setAttribute("cy", this.transformY(c.y));
+                }
+                // Cập nhật Đường thẳng đơn (A)--(B)
+                else if (obj.type === "draw_line") {
+                    const p1 = currentPts[obj.p1] || {x:0, y:0};
+                    const p2 = currentPts[obj.p2] || {x:0, y:0};
+                    subItem.dom.setAttribute("x1", this.transformX(p1.x));
+                    subItem.dom.setAttribute("y1", this.transformY(p1.y));
+                    subItem.dom.setAttribute("x2", this.transformX(p2.x));
+                    subItem.dom.setAttribute("y2", this.transformY(p2.y));
+                }
+                // Cập nhật Đa giác nhiều điểm (A)--(B)--(C)--cycle
+                else if (obj.type === "draw_lines") {
+                    const mappedPts = obj.points.map(pName => currentPts[pName] || {x:0, y:0});
+                    let d = "";
+                    mappedPts.forEach((p, idx) => {
+                        if (idx === 0) d += `M ${this.transformX(p.x)} ${this.transformY(p.y)} `;
+                        else d += `L ${this.transformX(p.x)} ${this.transformY(p.y)} `;
+                    });
+                    if (obj.close_path) d += "Z";
+                    subItem.dom.setAttribute("d", d);
+                }
+                // Cập nhật các Node Phức tạp (Nhãn chữ, chấm điểm)
+                else if (["fill_node", "node_label", "draw_line_label"].includes(obj.type)) {
+                    this.updateComplexObject(obj, subItem.group, currentPts);
+                }
+                // Cập nhật góc vuông / góc thường
+                else if (obj.type === "draw_right_angle" || obj.type === "draw_angle") {
+                    const p1 = currentPts[obj.p1] || {x:0, y:0};
+                    const vertex = currentPts[obj.vertex] || {x:0, y:0};
+                    const p2 = currentPts[obj.p2] || {x:0, y:0};
+                    
+                    const angleSize = 0.15;
+                    const v1x = p1.x - vertex.x, v1y = p1.y - vertex.y;
+                    const v2x = p2.x - vertex.x, v2y = p2.y - vertex.y;
+                    const len1 = Math.sqrt(v1x*v1x + v1y*v1y) || 1;
+                    const len2 = Math.sqrt(v2x*v2x + v2y*v2y) || 1;
+                    
+                    const ax = vertex.x + (v1x/len1) * angleSize;
+                    const ay = vertex.y + (v1y/len1) * angleSize;
+                    const bx = vertex.x + (v2x/len2) * angleSize;
+                    const by = vertex.y + (v2y/len2) * angleSize;
+                    const cx = ax + (bx - vertex.x);
+                    const cy = ay + (by - vertex.y);
+                    
+                    const d = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
+                    subItem.dom.setAttribute("d", d);
+                }
+            });
+        }
+    }
+
+    _cleanupEffect(eff) {
+        const item = this.svgElements[eff.target_id];
+        if (!item) return;
+
+        if (eff.type === "draw_dashed_light") {
+            // Turn solid after done
+            let makeSolid = true;
+            if (eff.params && eff.params.keepDashed) makeSolid = false;
+            if (makeSolid && item.dom) item.dom.style.strokeDasharray = "none";
+        }
+        if (eff.type === "change_style") {
+            if (item.dom) item.dom.style.transition = "none";
+            eff._styleApplied = false;
+        }
+        if (eff.spark) {
+            eff.spark.remove();
+        }
+    }
+
+    updateComplexObject(obj, group, points) {
+        group.innerHTML = "";
+        const getPt = (name) => points[name] || { x: 0, y: 0 };
+        const parseOpts = (optStr) => {
+            const attrs = { stroke: "#333", "stroke-width": "2", fill: "none" };
+            if (!optStr) return attrs;
+            if (optStr.includes("blue")) attrs.stroke = "#3b82f6";
+            if (optStr.includes("red")) attrs.stroke = "#ef4444";
+            if (optStr.includes("green")) attrs.stroke = "#22c55e";
+            if (optStr.includes("thick")) attrs["stroke-width"] = "3";
+            return attrs;
+        };
+
+        if (obj.type === "fill_node") {
+            const pt = getPt(obj.point);
+            const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            dot.setAttribute("cx", this.transformX(pt.x));
+            dot.setAttribute("cy", this.transformY(pt.y));
+            dot.setAttribute("r", "4");
+            const fillAttrs = parseOpts(obj.fill_options);
+            dot.setAttribute("fill", fillAttrs.stroke || "#333");
+            group.appendChild(dot);
+            this._addTextNode(group, pt, obj.label, obj.node_options);
+        }
+        else if (obj.type === "node_label") {
+            this._addTextNode(group, getPt(obj.at), obj.label, obj.options);
+        }
+        else if (obj.type === "draw_line_label") {
+            const p1 = getPt(obj.p1); const p2 = getPt(obj.p2);
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", this.transformX(p1.x)); line.setAttribute("y1", this.transformY(p1.y));
+            line.setAttribute("x2", this.transformX(p2.x)); line.setAttribute("y2", this.transformY(p2.y));
+            const attrs = parseOpts(obj.options);
+            for (let k in attrs) line.setAttribute(k, attrs[k]);
+            group.appendChild(line);
+            const midX = (p1.x + p2.x) / 2; const midY = (p1.y + p2.y) / 2;
+            this._addTextNode(group, {x: midX, y: midY}, obj.label, obj.node_options);
+        }
+    }
+
+    _addTextNode(group, pt, text, node_options) {
+        const cleanText = text.replace(/\$/g, "");
+        const svgText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        let tx = this.transformX(pt.x); let ty = this.transformY(pt.y);
+        let dx = 0; let dy = 0; let anchor = "middle"; let baseline = "middle";
+        if (node_options) {
+            if (node_options.includes("above")) { dy = -15; baseline = "baseline"; }
+            if (node_options.includes("below")) { dy = 15; baseline = "hanging"; }
+            if (node_options.includes("right")) { dx = 15; anchor = "start"; }
+            if (node_options.includes("left")) { dx = -15; anchor = "end"; }
+        }
+        svgText.setAttribute("x", tx + dx); svgText.setAttribute("y", ty + dy);
+        svgText.setAttribute("text-anchor", anchor); svgText.setAttribute("dominant-baseline", baseline);
+        svgText.setAttribute("font-family", "serif"); svgText.setAttribute("font-style", "italic");
+        svgText.setAttribute("font-size", "16px"); svgText.setAttribute("fill", "#000");
+        svgText.textContent = cleanText;
+        group.appendChild(svgText);
+    }
+}
+
+        window.onload = () => {
+            const dataScript = document.getElementById("mathanim-data");
+            const parsedData = JSON.parse(dataScript.textContent);
+            
+            const player = new MathAnimPlayer(document.getElementById("canvas-container"));
+            player.init(parsedData.visual_objects, parsedData.frames, parsedData.steps);
+            
+
+            // AutoPlay Logic
+            player.jumpToStep(0); // Start empty
+            
+            const startAutoPlay = () => {
+                const playNext = () => {
+                    if (player.currentStep < parsedData.steps.length) {
+                        player.currentStep++;
+                        player.playStep(player.currentStep, () => {
+                            setTimeout(playNext, 1000); // 1s pause between steps
+                        });
+                    }
+                };
+                setTimeout(playNext, 1000); // Wait 1s before starting
+            };
+            startAutoPlay();
+        
+        };
+    </script>
+</body>
+</html>

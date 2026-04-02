@@ -31,6 +31,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnExport) {
         btnExport.addEventListener("click", () => exportToStandaloneHTML(false));
     }
+    const btnRefresh = document.getElementById("btn-refresh-canvas");
+    if (btnRefresh) {
+        btnRefresh.addEventListener("click", () => {
+            // Clear SVG và reset về trạng thái ban đầu
+            window.player.svg.innerHTML = "";
+            window.player.svgElements = {};
+            window.player.steps = [];
+            window.player.currentStep = -1;
+            window.player.isPlaying = false;
+            window.player.isStopRequested = false;
+            if (window.player.animationFrameId) cancelAnimationFrame(window.player.animationFrameId);
+            // Re-run code để vẽ lại
+            runCode(tikzInput.value);
+        });
+    }
 
     initStepUI();
 });
@@ -211,6 +226,21 @@ async function runCode(code) {
         btnRun.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Baking...`;
         btnRun.disabled = true;
 
+        // Tự động đọc @param từ code TikZ
+        let paramConfig = { param_name: "t", t_min: 0, t_max: 1, total_frames: 60 };
+        const paramMatch = code.match(/@param:\s*\{([^}]+)\}/);
+        if (paramMatch) {
+            const params = paramMatch[1];
+            const nameMatch = params.match(/name:\s*(\w+)/);
+            const minMatch = params.match(/min:\s*([\d.]+)/);
+            const maxMatch = params.match(/max:\s*([\d.]+)/);
+            const framesMatch = params.match(/frames:\s*(\d+)/);
+            if (nameMatch) paramConfig.param_name = nameMatch[1];
+            if (minMatch) paramConfig.t_min = parseFloat(minMatch[1]);
+            if (maxMatch) paramConfig.t_max = parseFloat(maxMatch[1]);
+            if (framesMatch) paramConfig.total_frames = parseInt(framesMatch[1]);
+        }
+
         const response = await fetch(API_URL, {
             method: "POST",
             headers: {
@@ -218,10 +248,10 @@ async function runCode(code) {
             },
             body: JSON.stringify({
                 code: code,
-                param_name: "t",
-                t_min: 0,
-                t_max: 1,
-                total_frames: 60 // Need ~60 frames for 'move' interpolation
+                param_name: paramConfig.param_name,
+                t_min: paramConfig.t_min,
+                t_max: paramConfig.t_max,
+                total_frames: paramConfig.total_frames
             })
         });
 
@@ -238,7 +268,6 @@ async function runCode(code) {
             window.player.init(window.visualObjects, window.frames, window.player.steps);
             updateOutliner(window.visualObjects);
             
-            // Removed automatic fallback fading. User will create steps manually or use Auto-assign.
             if (window.player.steps.length > 0) {
                 renderStepsUI();
             }
@@ -299,7 +328,6 @@ window.renderOutlinerProps = (obj) => {
     window.selectedOutlinerObj = obj;
     const propsContainer = document.getElementById("outliner-props");
     
-    // Determine default effect based on type
     let defaultType = "fade_in";
     if (obj.type === "draw_circle") defaultType = "draw_light";
     else if (obj.type.includes("draw")) defaultType = "draw";
@@ -316,7 +344,8 @@ window.renderOutlinerProps = (obj) => {
                 <option value="draw_dashed_light" ${defaultType==='draw_dashed_light'?'selected':''}>Dashed Light</option>
                 <option value="fade_in" ${defaultType==='fade_in'?'selected':''}>Fade In</option>
                 <option value="fill" ${defaultType==='fill'?'selected':''}>Fill</option>
-                <option value="move" ${defaultType==='move'?'selected':''}>Move</option>
+                <option value="time_shift" ${defaultType==='time_shift'?'selected':''}>Time Shift (Move)</option>
+                <option value="change_style" ${defaultType==='change_style'?'selected':''}>Change Style</option>
             </select>
         </div>
         
@@ -325,20 +354,141 @@ window.renderOutlinerProps = (obj) => {
             <input type="number" id="prop-duration" class="w-full text-sm border border-gray-300 rounded px-2 py-1" value="1000" step="100">
         </div>
 
-        <div class="mb-2">
-            <label class="block text-xs font-bold text-gray-700 mb-1">Color (optional)</label>
-            <input type="text" id="prop-color" class="w-full text-sm border border-gray-300 rounded px-2 py-1" placeholder="#ff0000, red...">
-        </div>
+        <div id="prop-dynamic-options"></div>
 
-        <div class="mb-4">
-            <label class="block text-xs font-bold text-gray-700 mb-1">Params (JSON)</label>
-            <textarea id="prop-params" class="w-full text-xs font-mono border border-gray-300 rounded px-2 py-1 h-14" placeholder='{"opacity": 0.5}'></textarea>
-        </div>
-
-        <button onclick="window.addEffectFromProps()" class="w-full bg-blue-600 hover:bg-blue-500 text-white rounded py-1.5 text-sm font-bold shadow-sm transition">
+        <button onclick="window.addEffectFromProps()" class="w-full bg-blue-600 hover:bg-blue-500 text-white rounded py-1.5 text-sm font-bold shadow-sm transition mt-3">
             <i class="fa-solid fa-plus"></i> Add to Step
         </button>
     `;
+    
+    // Render dynamic options and bind change event
+    window.renderPropDynamicOptions(defaultType);
+    document.getElementById('prop-effect').addEventListener('change', (e) => {
+        window.renderPropDynamicOptions(e.target.value);
+    });
+};
+
+window.renderPropDynamicOptions = (effectType) => {
+    const container = document.getElementById('prop-dynamic-options');
+    if (!container) return;
+    
+    let html = '';
+    if (effectType === 'draw' || effectType === 'draw_light' || effectType === 'draw_dashed_light') {
+        html = `
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Stroke Color</label>
+                <div class="flex gap-2">
+                    <input type="color" id="prop-color-picker" value="#333333" class="w-8 h-8 rounded cursor-pointer border border-gray-300">
+                    <input type="text" id="prop-color" class="flex-1 text-sm border border-gray-300 rounded px-2 py-1" placeholder="#ff0000, red, blue...">
+                </div>
+            </div>
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Stroke Width</label>
+                <select id="prop-stroke-width" class="w-full text-sm border border-gray-300 bg-white rounded px-2 py-1">
+                    <option value="">Mặc định</option>
+                    <option value="1">1px (mỏng)</option>
+                    <option value="2">2px (thường)</option>
+                    <option value="3">3px (dày)</option>
+                    <option value="4">4px (rất dày)</option>
+                </select>
+            </div>
+            ${effectType === 'draw_dashed_light' ? `
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Dash Pattern</label>
+                <input type="text" id="prop-dashed" class="w-full text-sm font-mono border border-gray-300 rounded px-2 py-1" placeholder="5,10" value="5,10">
+                <p class="text-[10px] text-gray-400 mt-0.5">Format: dash,gap (ví dụ: 5,10)</p>
+            </div>` : ''}
+        `;
+    } else if (effectType === 'fill') {
+        html = `
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Fill Color</label>
+                <div class="flex gap-2">
+                    <input type="color" id="prop-fill-color-picker" value="#a9b1d6" class="w-8 h-8 rounded cursor-pointer border border-gray-300">
+                    <input type="text" id="prop-color" class="flex-1 text-sm border border-gray-300 rounded px-2 py-1" placeholder="#a9b1d6, red, rgba...">
+                </div>
+            </div>
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Opacity</label>
+                <input type="range" id="prop-fill-opacity" min="0" max="1" step="0.05" value="0.5" class="w-full">
+                <div class="flex justify-between text-[10px] text-gray-400">
+                    <span>0%</span>
+                    <span id="prop-opacity-value">50%</span>
+                    <span>100%</span>
+                </div>
+            </div>
+        `;
+    } else if (effectType === 'time_shift') {
+        html = `
+            <div class="mb-2 p-2 bg-blue-50 rounded border border-blue-200">
+                <p class="text-[10px] text-blue-600"><i class="fa-solid fa-info-circle mr-1"></i>Time Shift di chuyển tất cả đối tượng theo frames đã bake từ backend. Không cần cấu hình thêm.</p>
+            </div>
+        `;
+    } else if (effectType === 'change_style') {
+        html = `
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">New Stroke Color</label>
+                <div class="flex gap-2">
+                    <input type="color" id="prop-color-picker" value="#333333" class="w-8 h-8 rounded cursor-pointer border border-gray-300">
+                    <input type="text" id="prop-color" class="flex-1 text-sm border border-gray-300 rounded px-2 py-1" placeholder="#ff0000, red...">
+                </div>
+            </div>
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">New Stroke Width</label>
+                <select id="prop-stroke-width" class="w-full text-sm border border-gray-300 bg-white rounded px-2 py-1">
+                    <option value="">Giữ nguyên</option>
+                    <option value="1">1px</option>
+                    <option value="2">2px</option>
+                    <option value="3">3px</option>
+                    <option value="4">4px</option>
+                </select>
+            </div>
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Dash Pattern (optional)</label>
+                <input type="text" id="prop-dashed" class="w-full text-sm font-mono border border-gray-300 rounded px-2 py-1" placeholder="5,5 hoặc none">
+            </div>
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Fill Color (optional)</label>
+                <input type="text" id="prop-fill-color" class="w-full text-sm border border-gray-300 rounded px-2 py-1" placeholder="red, rgba(255,0,0,0.5)...">
+            </div>
+        `;
+    } else {
+        html = `
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Color (optional)</label>
+                <input type="text" id="prop-color" class="w-full text-sm border border-gray-300 rounded px-2 py-1" placeholder="#ff0000, red...">
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+    
+    // Bind opacity slider
+    const opacitySlider = document.getElementById('prop-fill-opacity');
+    const opacityValue = document.getElementById('prop-opacity-value');
+    if (opacitySlider && opacityValue) {
+        opacitySlider.addEventListener('input', () => {
+            opacityValue.textContent = Math.round(opacitySlider.value * 100) + '%';
+        });
+    }
+    
+    // Bind color picker sync
+    const colorPicker = document.getElementById('prop-color-picker');
+    const colorInput = document.getElementById('prop-color');
+    if (colorPicker && colorInput) {
+        colorPicker.addEventListener('input', () => { colorInput.value = colorPicker.value; });
+        colorInput.addEventListener('input', () => { 
+            if (/^#[0-9a-fA-F]{6}$/.test(colorInput.value)) colorPicker.value = colorInput.value; 
+        });
+    }
+    
+    const fillColorPicker = document.getElementById('prop-fill-color-picker');
+    const fillColorInput = document.getElementById('prop-color');
+    if (fillColorPicker && fillColorInput) {
+        fillColorPicker.addEventListener('input', () => { fillColorInput.value = fillColorPicker.value; });
+        fillColorInput.addEventListener('input', () => { 
+            if (/^#[0-9a-fA-F]{6}$/.test(fillColorInput.value)) fillColorPicker.value = fillColorInput.value; 
+        });
+    }
 };
 
 window.addEffectFromProps = () => {
@@ -354,21 +504,36 @@ window.addEffectFromProps = () => {
     
     const effType = document.getElementById("prop-effect").value;
     const duration = parseInt(document.getElementById("prop-duration").value) || 1000;
-    const color = document.getElementById("prop-color").value.trim();
-    const paramsStr = document.getElementById("prop-params").value.trim();
     
-    let params = undefined;
-    if (paramsStr) {
-        try { params = JSON.parse(paramsStr); }
-        catch (e) { alert("Lỗi JSON Format"); return; }
+    // Collect params from dynamic UI
+    let params = {};
+    let color = undefined;
+    
+    if (effType === 'draw' || effType === 'draw_light' || effType === 'draw_dashed_light' || effType === 'change_style') {
+        color = document.getElementById("prop-color")?.value.trim() || undefined;
+        const sw = document.getElementById("prop-stroke-width")?.value;
+        if (sw) params.strokeWidth = sw;
+        const dashed = document.getElementById("prop-dashed")?.value.trim();
+        if (dashed && dashed !== 'none') params.dashed = dashed;
+        if (effType === 'change_style') {
+            const fillC = document.getElementById("prop-fill-color")?.value.trim();
+            if (fillC) params.fill = fillC;
+        }
+    } else if (effType === 'fill') {
+        color = document.getElementById("prop-color")?.value.trim() || "rgba(169, 177, 214, 0.5)";
+        const opacity = document.getElementById("prop-fill-opacity")?.value;
+        if (opacity) params.opacity = parseFloat(opacity);
     }
+    
+    // Remove empty params
+    if (Object.keys(params).length === 0) params = undefined;
     
     const objId = window.selectedOutlinerObj._id;
     window.player.steps[currentStep - 1].push({
         target_id: objId,
         type: effType,
         duration: duration,
-        color: color || undefined,
+        color: color,
         params: params
     });
     
@@ -502,44 +667,51 @@ function initStepUI() {
         }
     });
 
-    // Event Delegation tập trung cho toàn bộ Timeline
     const timelineContainer = document.getElementById('timeline-steps');
     if (timelineContainer) {
+        // Chặn drag khi nhấn vào nút delete
+        timelineContainer.addEventListener('mousedown', (e) => {
+            const btnDel = e.target.closest('[data-action="delete-eff"], [data-action="delete-step"]');
+            if (btnDel) {
+                e.preventDefault(); // Chặn dragstart
+            }
+        });
+
+        // Router tập trung duy nhất cho mọi hành động trên Timeline
         timelineContainer.addEventListener('click', (e) => {
-            // 1. Nút xóa hiệu ứng (Phải check TRƯỚC khi check item)
-            const deleteEffBtn = e.target.closest('.delete-eff-btn');
-            if (deleteEffBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                const stepIdx = parseInt(deleteEffBtn.getAttribute('data-step'));
-                const effIdx = parseInt(deleteEffBtn.getAttribute('data-eff'));
+            
+            // 1. Kiểm tra nút Xóa Effect (Ưu tiên cao nhất)
+            const btnDelEff = e.target.closest('[data-action="delete-eff"]');
+            if (btnDelEff) {
+                e.stopPropagation(); // Chặn sủi bọt ngay lập tức
+                const stepIdx = parseInt(btnDelEff.dataset.step);
+                const effIdx = parseInt(btnDelEff.dataset.eff);
                 window.deleteEffect(stepIdx, effIdx);
                 return;
             }
-            
-            // 2. Click vào hiệu ứng đơn lẻ -> Mở Editor
-            const effectItem = e.target.closest('.effect-item');
-            if (effectItem) {
-                const stepIdx = parseInt(effectItem.getAttribute('data-step'));
-                const effIdx = parseInt(effectItem.getAttribute('data-eff'));
+
+            // 2. Kiểm tra nút Xóa Step
+            const btnDelStep = e.target.closest('[data-action="delete-step"]');
+            if (btnDelStep) {
+                e.stopPropagation();
+                const stepIdx = parseInt(btnDelStep.dataset.step);
+                window.deleteStep(stepIdx);
+                return;
+            }
+
+            // 3. Kiểm tra mở Editor (Click vào khung hiệu ứng)
+            const effItem = e.target.closest('[data-action="edit-eff"]');
+            if (effItem) {
+                const stepIdx = parseInt(effItem.dataset.step);
+                const effIdx = parseInt(effItem.dataset.eff);
                 window.openEffectEditor(stepIdx, effIdx);
                 return;
             }
 
-            // 3. Nút xóa Step
-            const deleteStepBtn = e.target.closest('.delete-step-btn');
-            if (deleteStepBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                const stepIdx = parseInt(deleteStepBtn.getAttribute('data-step'));
-                window.deleteStep(stepIdx);
-                return;
-            }
-            
-            // 4. Click vào Header của Step -> Chuyển active step
-            const stepHeader = e.target.closest('.step-header');
+            // 4. Kiểm tra chọn Step (Click vào Header)
+            const stepHeader = e.target.closest('[data-action="select-step"]');
             if (stepHeader) {
-                const stepIdx = parseInt(stepHeader.getAttribute('data-step'));
+                const stepIdx = parseInt(stepHeader.dataset.step);
                 window.player.currentStep = stepIdx + 1;
                 renderStepsUI();
                 return;
@@ -571,7 +743,7 @@ function renderStepsUI() {
             let icon = "fa-eye";
             let color = "text-green-600";
             if (eff.type.includes("draw")) { icon="fa-pen-nib"; color="text-blue-600"; }
-            if (eff.type === ("move")) { icon="fa-arrows-up-down-left-right"; color="text-purple-600"; }
+            if (eff.type === "time_shift") { icon="fa-arrows-up-down-left-right"; color="text-purple-600"; }
             if (eff.type === ("fill")) { icon="fa-fill-drip"; color="text-red-600"; }
             
             let formatStr = `${eff.duration}ms`;
@@ -580,16 +752,22 @@ function renderStepsUI() {
             effectsHtml += `
                 <div class="flex flex-col text-xs bg-gray-50 border border-gray-200 rounded p-2 mb-1 cursor-pointer hover:border-blue-400 group effect-item" 
                     draggable="true" 
-                    data-step="${index}" data-eff="${effIdx}"
+                    data-action="edit-eff" data-step="${index}" data-eff="${effIdx}"
                     ondragstart="window.handleDragStart(event, ${index}, ${effIdx})" 
                     ondragover="window.handleDragOver(event)" 
                     ondrop="window.handleDrop(event, ${index}, ${effIdx})">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center pointer-events-none">
                         <span class="font-mono text-gray-700 font-bold">${eff.target_id}</span>
                         <div class="flex gap-2 items-center">
                             <span class="${color} font-medium flex items-center gap-1"><i class="fa-solid ${icon}"></i> ${eff.type} (${formatStr})</span>
-                            <button class="text-red-500 hover:text-red-700 hidden group-hover:block delete-eff-btn" data-step="${index}" data-eff="${effIdx}"><i class="fa-solid fa-trash"></i></button>
                         </div>
+                    </div>
+                    <div class="flex justify-end mt-1">
+                        <button class="text-red-500 hover:text-red-700 hidden group-hover:block pointer-events-auto" 
+                                data-action="delete-eff" data-step="${index}" data-eff="${effIdx}" 
+                                title="Xóa hiệu ứng này" draggable="false">
+                            <i class="fa-solid fa-trash" draggable="false"></i>
+                        </button>
                     </div>
                 </div>
             `;
@@ -599,14 +777,20 @@ function renderStepsUI() {
         stepDiv.className = `step-container border rounded-md mb-4 shadow-sm overflow-hidden ${isActive ? 'bg-white border-blue-500 ring-1 ring-blue-500' : 'bg-gray-50 border-gray-300'}`;
         stepDiv.innerHTML = `
             <div class="px-3 py-1.5 border-b flex justify-between items-center cursor-pointer transition-colors step-header ${isActive ? 'bg-blue-100 border-blue-300' : 'bg-gray-200 border-gray-300 hover:bg-gray-300'}" 
-                 data-step="${index}"
+                 data-action="select-step" data-step="${index}"
                  ondragover="window.handleDragOver(event)"
                  ondrop="window.handleStepDrop(event, ${index})">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 pointer-events-none">
                     <span class="font-bold ${isActive ? 'text-blue-800' : 'text-gray-700'} text-sm">Step ${stepNum}</span>
-                    <span class="text-[10px] ${isActive ? 'text-blue-600' : 'text-gray-500'} bg-white px-1 py-0.5 rounded border border-gray-200">${stepEffects.length} effects</span>
+                    <div class="flex gap-2 items-center">
+                        <span class="text-xs ${isActive ? 'text-blue-600' : 'text-gray-500'} bg-white px-1.5 py-0.5 rounded border border-gray-200">${stepEffects.length} effects</span>
+                    </div>
                 </div>
-                <button class="text-gray-400 hover:text-red-500 p-1 delete-step-btn" data-step="${index}"><i class="fa-solid fa-trash-can"></i></button>
+                <button class="text-red-400 hover:text-red-600 hover:bg-red-50 px-1.5 py-0.5 rounded transition pointer-events-auto" 
+                        data-action="delete-step" data-step="${index}" 
+                        title="Xóa toàn bộ Step này" draggable="false">
+                    <i class="fa-solid fa-trash-can" draggable="false"></i>
+                </button>
             </div>
             <div class="p-2 min-h-[40px] flex flex-col">
                 ${effectsHtml}
@@ -662,17 +846,24 @@ window.deleteEffect = (stepIdx, effIdx) => {
     if (confirm("Xóa hiệu ứng này?")) {
         window.player.steps[stepIdx].splice(effIdx, 1);
         renderStepsUI();
+        // Ép SVG cập nhật lại ngay lập tức (Hard Reset)
+        window.player.jumpToStep(window.player.currentStep);
     }
 };
 
 window.deleteStep = (stepIdx) => {
     if (confirm(`Xóa toàn bộ Step ${stepIdx + 1}?`)) {
         window.player.steps.splice(stepIdx, 1);
-        // Adjust currentStep if needed
+        
+        // Điều chỉnh lại currentStep nếu nó vượt quá giới hạn
         if (window.player.currentStep > window.player.steps.length) {
             window.player.currentStep = window.player.steps.length;
         }
+        if (window.player.currentStep < 0) window.player.currentStep = 0;
+        
         renderStepsUI();
+        // Ép SVG cập nhật lại ngay lập tức (Hard Reset)
+        window.player.jumpToStep(window.player.currentStep);
     }
 };
 
@@ -681,9 +872,144 @@ window.openEffectEditor = (stepIdx, effIdx) => {
     document.getElementById('edit-step-idx').value = stepIdx;
     document.getElementById('edit-eff-idx').value = effIdx;
     document.getElementById('edit-duration').value = eff.duration || 1000;
-    document.getElementById('edit-color').value = eff.color || '';
-    document.getElementById('edit-params').value = eff.params ? JSON.stringify(eff.params) : '';
+    document.getElementById('edit-effect-type').value = eff.type || 'fade_in';
+    document.getElementById('modal-title').textContent = `Edit Effect: ${eff.target_id}`;
+    
+    // Render dynamic options
+    window.renderEditDynamicOptions(eff.type || 'fade_in', eff);
+    
     document.getElementById('effect-editor-modal').classList.remove('hidden');
+    
+    // Bind effect type change
+    document.getElementById('edit-effect-type').onchange = (e) => {
+        window.renderEditDynamicOptions(e.target.value, eff);
+    };
+};
+
+window.renderEditDynamicOptions = (effectType, eff) => {
+    const container = document.getElementById('edit-dynamic-options');
+    const params = eff.params || {};
+    let html = '';
+    
+    if (effectType === 'draw' || effectType === 'draw_light' || effectType === 'draw_dashed_light') {
+        const colorVal = eff.color || '#333333';
+        html = `
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Stroke Color</label>
+                <div class="flex gap-2">
+                    <input type="color" id="edit-color-picker" value="${colorVal}" class="w-8 h-8 rounded cursor-pointer border border-gray-300">
+                    <input type="text" id="edit-color" class="flex-1 text-sm border border-gray-300 rounded px-2 py-1.5" value="${eff.color || ''}" placeholder="#ff0000, red...">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Stroke Width</label>
+                <select id="edit-stroke-width" class="w-full text-sm border border-gray-300 bg-white rounded px-2 py-1.5">
+                    <option value="">Mặc định</option>
+                    <option value="1" ${params.strokeWidth==='1'?'selected':''}>1px (mỏng)</option>
+                    <option value="2" ${params.strokeWidth==='2'?'selected':''}>2px (thường)</option>
+                    <option value="3" ${params.strokeWidth==='3'?'selected':''}>3px (dày)</option>
+                    <option value="4" ${params.strokeWidth==='4'?'selected':''}>4px (rất dày)</option>
+                </select>
+            </div>
+            ${effectType === 'draw_dashed_light' ? `
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Dash Pattern</label>
+                <input type="text" id="edit-dashed" class="w-full text-sm font-mono border border-gray-300 rounded px-2 py-1.5" placeholder="5,10" value="${params.dashed || '5,10'}">
+            </div>` : ''}
+        `;
+    } else if (effectType === 'fill') {
+        const colorVal = eff.color || '#a9b1d6';
+        const opacityVal = params.opacity || 0.5;
+        html = `
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Fill Color</label>
+                <div class="flex gap-2">
+                    <input type="color" id="edit-fill-color-picker" value="${colorVal}" class="w-8 h-8 rounded cursor-pointer border border-gray-300">
+                    <input type="text" id="edit-color" class="flex-1 text-sm border border-gray-300 rounded px-2 py-1.5" value="${eff.color || ''}" placeholder="#a9b1d6, red...">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Opacity</label>
+                <input type="range" id="edit-fill-opacity" min="0" max="1" step="0.05" value="${opacityVal}" class="w-full">
+                <div class="flex justify-between text-[10px] text-gray-400">
+                    <span>0%</span>
+                    <span id="edit-opacity-value">${Math.round(opacityVal*100)}%</span>
+                    <span>100%</span>
+                </div>
+            </div>
+        `;
+    } else if (effectType === 'time_shift') {
+        html = `
+            <div class="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+                <p class="text-[10px] text-blue-600"><i class="fa-solid fa-info-circle mr-1"></i>Time Shift di chuyển tất cả đối tượng theo frames đã bake từ backend. Không cần cấu hình thêm.</p>
+            </div>
+        `;
+    } else if (effectType === 'change_style') {
+        const colorVal = eff.color || '#333333';
+        html = `
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">New Stroke Color</label>
+                <div class="flex gap-2">
+                    <input type="color" id="edit-color-picker" value="${colorVal}" class="w-8 h-8 rounded cursor-pointer border border-gray-300">
+                    <input type="text" id="edit-color" class="flex-1 text-sm border border-gray-300 rounded px-2 py-1.5" value="${eff.color || ''}" placeholder="#ff0000, red...">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">New Stroke Width</label>
+                <select id="edit-stroke-width" class="w-full text-sm border border-gray-300 bg-white rounded px-2 py-1.5">
+                    <option value="">Giữ nguyên</option>
+                    <option value="1" ${params.strokeWidth==='1'?'selected':''}>1px</option>
+                    <option value="2" ${params.strokeWidth==='2'?'selected':''}>2px</option>
+                    <option value="3" ${params.strokeWidth==='3'?'selected':''}>3px</option>
+                    <option value="4" ${params.strokeWidth==='4'?'selected':''}>4px</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Dash Pattern (optional)</label>
+                <input type="text" id="edit-dashed" class="w-full text-sm font-mono border border-gray-300 rounded px-2 py-1.5" placeholder="5,5 hoặc none" value="${params.dashed || ''}">
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Fill Color (optional)</label>
+                <input type="text" id="edit-fill-color" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="red, rgba(255,0,0,0.5)..." value="${params.fill || ''}">
+            </div>
+        `;
+    } else {
+        html = `
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Color (optional)</label>
+                <input type="text" id="edit-color" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" value="${eff.color || ''}" placeholder="#ff0000, red...">
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+    
+    // Bind opacity slider
+    const opacitySlider = document.getElementById('edit-fill-opacity');
+    const opacityValue = document.getElementById('edit-opacity-value');
+    if (opacitySlider && opacityValue) {
+        opacitySlider.addEventListener('input', () => {
+            opacityValue.textContent = Math.round(opacitySlider.value * 100) + '%';
+        });
+    }
+    
+    // Bind color picker sync
+    const colorPicker = document.getElementById('edit-color-picker');
+    const colorInput = document.getElementById('edit-color');
+    if (colorPicker && colorInput) {
+        colorPicker.addEventListener('input', () => { colorInput.value = colorPicker.value; });
+        colorInput.addEventListener('input', () => { 
+            if (/^#[0-9a-fA-F]{6}$/.test(colorInput.value)) colorPicker.value = colorInput.value; 
+        });
+    }
+    
+    const fillColorPicker = document.getElementById('edit-fill-color-picker');
+    const fillColorInput = document.getElementById('edit-color');
+    if (fillColorPicker && fillColorInput) {
+        fillColorPicker.addEventListener('input', () => { fillColorInput.value = fillColorPicker.value; });
+        fillColorInput.addEventListener('input', () => { 
+            if (/^#[0-9a-fA-F]{6}$/.test(fillColorInput.value)) fillColorPicker.value = fillColorInput.value; 
+        });
+    }
 };
 
 window.closeEffectEditor = () => {
@@ -695,24 +1021,39 @@ window.saveEffectParams = () => {
     const effIdx = parseInt(document.getElementById('edit-eff-idx').value);
     const eff = window.player.steps[stepIdx][effIdx];
     
+    eff.type = document.getElementById('edit-effect-type').value;
     eff.duration = parseInt(document.getElementById('edit-duration').value) || 1000;
-    eff.color = document.getElementById('edit-color').value.trim();
-    const paramsStr = document.getElementById('edit-params').value.trim();
-    if (paramsStr) {
-        try {
-            eff.params = JSON.parse(paramsStr);
-        } catch (e) {
-            alert("Lỗi JSON Format");
-            return;
+    
+    let params = {};
+    let color = undefined;
+    const effType = eff.type;
+    
+    if (effType === 'draw' || effType === 'draw_light' || effType === 'draw_dashed_light' || effType === 'change_style') {
+        color = document.getElementById("edit-color")?.value.trim() || undefined;
+        const sw = document.getElementById("edit-stroke-width")?.value;
+        if (sw) params.strokeWidth = sw;
+        const dashed = document.getElementById("edit-dashed")?.value.trim();
+        if (dashed && dashed !== 'none') params.dashed = dashed;
+        if (effType === 'change_style') {
+            const fillC = document.getElementById("edit-fill-color")?.value.trim();
+            if (fillC) params.fill = fillC;
         }
-    } else {
-        delete eff.params;
+    } else if (effType === 'fill') {
+        color = document.getElementById("edit-color")?.value.trim() || "rgba(169, 177, 214, 0.5)";
+        const opacity = document.getElementById("edit-fill-opacity")?.value;
+        if (opacity) params.opacity = parseFloat(opacity);
     }
+    
+    if (Object.keys(params).length === 0) {
+        delete eff.params;
+    } else {
+        eff.params = params;
+    }
+    eff.color = color;
     
     window.closeEffectEditor();
     renderStepsUI();
     
-    // Auto jump so user can replay easily
     window.player.jumpToStep(stepIdx);
     window.player.currentStep = stepIdx + 1;
 };
@@ -817,10 +1158,55 @@ class MathAnimPlayer {
                 for (let k in attrs) dom.setAttribute(k, attrs[k]);
                 group.appendChild(dom);
             }
+            else if (obj.type === "draw_line") {
+                const p1 = getPt(obj.p1);
+                const p2 = getPt(obj.p2);
+                dom = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                dom.setAttribute("x1", this.transformX(p1.x));
+                dom.setAttribute("y1", this.transformY(p1.y));
+                dom.setAttribute("x2", this.transformX(p2.x));
+                dom.setAttribute("y2", this.transformY(p2.y));
+                const attrs = parseOpts(obj.options);
+                for (let k in attrs) dom.setAttribute(k, attrs[k]);
+                group.appendChild(dom);
+            }
             else if (obj.type === "fill_node" || obj.type === "node_label" || obj.type === "draw_line_label") {
                 // Complex objects treated as grouped
                 this.updateComplexObject(obj, group, points0);
                 dom = group; 
+            }
+            else if (obj.type === "draw_right_angle" || obj.type === "draw_angle") {
+                // Góc vuông / góc thường - vẽ path hình chữ L nhỏ
+                const p1 = getPt(obj.p1);
+                const vertex = getPt(obj.vertex);
+                const p2 = getPt(obj.p2);
+                
+                const size = 2; // 2mm ≈ 0.15 unit, dùng fixed 0.15
+                const angleSize = 0.15;
+                
+                // Vector từ vertex đến p1 và p2
+                const v1x = p1.x - vertex.x, v1y = p1.y - vertex.y;
+                const v2x = p2.x - vertex.x, v2y = p2.y - vertex.y;
+                const len1 = Math.sqrt(v1x*v1x + v1y*v1y) || 1;
+                const len2 = Math.sqrt(v2x*v2x + v2y*v2y) || 1;
+                
+                // Điểm trên 2 cạnh cách vertex một khoảng angleSize
+                const ax = vertex.x + (v1x/len1) * angleSize;
+                const ay = vertex.y + (v1y/len1) * angleSize;
+                const bx = vertex.x + (v2x/len2) * angleSize;
+                const by = vertex.y + (v2y/len2) * angleSize;
+                
+                // Điểm góc vuông
+                const cx = ax + (bx - vertex.x);
+                const cy = ay + (by - vertex.y);
+                
+                const d = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
+                dom = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                dom.setAttribute("d", d);
+                dom.setAttribute("fill", "none");
+                dom.setAttribute("stroke", "#333");
+                dom.setAttribute("stroke-width", "1");
+                group.appendChild(dom);
             }
             
             if (obj.type !== "fill_node" && obj.type !== "node_label" && obj.type !== "draw_line_label") {
@@ -953,6 +1339,15 @@ class MathAnimPlayer {
                 });
                 if (obj.close_path) d += "Z";
                 item.dom.setAttribute("d", d);
+            } else if (obj.type === "draw_line") {
+                const p1 = points0[obj.p1] || { x: 0, y: 0 };
+                const p2 = points0[obj.p2] || { x: 0, y: 0 };
+                item.dom.setAttribute("x1", this.transformX(p1.x));
+                item.dom.setAttribute("y1", this.transformY(p1.y));
+                item.dom.setAttribute("x2", this.transformX(p2.x));
+                item.dom.setAttribute("y2", this.transformY(p2.y));
+            } else if (obj.type === "draw_right_angle" || obj.type === "draw_angle") {
+                this.updateComplexObject(obj, item.group, points0);
             } else {
                 // Object phức tạp (điểm, chữ, label)
                 this.updateComplexObject(obj, item.group, points0);
@@ -1046,6 +1441,8 @@ class MathAnimPlayer {
             
             // Apply color if requested
             if (eff.color) item.dom.style.stroke = eff.color;
+            // Apply stroke width from params
+            if (eff.params && eff.params.strokeWidth) item.dom.setAttribute("stroke-width", eff.params.strokeWidth);
 
             if (eff.type === "draw") {
                 item.dom.style.strokeDashoffset = eff.length * (1 - progress);
@@ -1086,51 +1483,78 @@ class MathAnimPlayer {
             }
         }
         else if (eff.type === "time_shift" && this.frames.length > 0) {
-            let tStart = (eff.params && eff.params.t_start !== undefined) ? eff.params.t_start : 0.0;
-            let tEnd = (eff.params && eff.params.t_end !== undefined) ? eff.params.t_end : 1.0;
-            const currentT = tStart + progress * (tEnd - tStart);
-            
             const totalFrames = this.frames.length;
-            let fIndex = Math.round(currentT * (totalFrames - 1));
+            let fIndex = Math.round(progress * (totalFrames - 1));
             fIndex = Math.max(0, Math.min(fIndex, totalFrames - 1));
             const currentPts = this.frames[fIndex].points;
             
-            // Duyệt TẤT CẢ visualObjects để đồng bộ tọa độ
+            // DUYỆT QUA TẤT CẢ OBJECT ĐỂ UPDATE (hiệu ứng toàn cục)
             this.visualObjects.forEach(obj => {
                 const subItem = this.svgElements[obj._id];
-                if (!subItem || !subItem.dom) return;
+                if (!subItem) return;
                 
-                // Tắt transition khi đang dịch chuyển để mượt
-                if (subItem.dom.style.transition && subItem.dom.style.transition !== "none") {
+                // Set visible — time_shift cần object hiện rõ
+                subItem.group.style.opacity = "1";
+                
+                if (subItem.dom) {
+                    // Tắt CSS transition để không bị giật
                     subItem.dom.style.transition = "none";
+                    // Xóa stroke-dash để đường luôn vẽ đầy (không bị draw effect chồng)
+                    subItem.dom.style.strokeDasharray = "none";
+                    subItem.dom.style.strokeDashoffset = "0";
                 }
 
+                // Cập nhật Hình Tròn
                 if (obj.type === "draw_circle") {
                     const c = currentPts[obj.center] || {x:0, y:0};
                     subItem.dom.setAttribute("cx", this.transformX(c.x));
                     subItem.dom.setAttribute("cy", this.transformY(c.y));
                 }
-                else if (obj.type === "draw_line" || obj.type === "draw_lines") {
-                    if (obj.type === "draw_line") {
-                        const p1 = currentPts[obj.p1] || {x:0, y:0};
-                        const p2 = currentPts[obj.p2] || {x:0, y:0};
-                        subItem.dom.setAttribute("x1", this.transformX(p1.x));
-                        subItem.dom.setAttribute("y1", this.transformY(p1.y));
-                        subItem.dom.setAttribute("x2", this.transformX(p2.x));
-                        subItem.dom.setAttribute("y2", this.transformY(p2.y));
-                    } else {
-                        const mappedPts = obj.points.map(pName => currentPts[pName] || {x:0, y:0});
-                        let d = "";
-                        mappedPts.forEach((p, idx) => {
-                            if (idx === 0) d += `M ${this.transformX(p.x)} ${this.transformY(p.y)} `;
-                            else d += `L ${this.transformX(p.x)} ${this.transformY(p.y)} `;
-                        });
-                        if (obj.close_path) d += "Z";
-                        subItem.dom.setAttribute("d", d);
-                    }
+                // Cập nhật Đường thẳng đơn (A)--(B)
+                else if (obj.type === "draw_line") {
+                    const p1 = currentPts[obj.p1] || {x:0, y:0};
+                    const p2 = currentPts[obj.p2] || {x:0, y:0};
+                    subItem.dom.setAttribute("x1", this.transformX(p1.x));
+                    subItem.dom.setAttribute("y1", this.transformY(p1.y));
+                    subItem.dom.setAttribute("x2", this.transformX(p2.x));
+                    subItem.dom.setAttribute("y2", this.transformY(p2.y));
                 }
+                // Cập nhật Đa giác nhiều điểm (A)--(B)--(C)--cycle
+                else if (obj.type === "draw_lines") {
+                    const mappedPts = obj.points.map(pName => currentPts[pName] || {x:0, y:0});
+                    let d = "";
+                    mappedPts.forEach((p, idx) => {
+                        if (idx === 0) d += `M ${this.transformX(p.x)} ${this.transformY(p.y)} `;
+                        else d += `L ${this.transformX(p.x)} ${this.transformY(p.y)} `;
+                    });
+                    if (obj.close_path) d += "Z";
+                    subItem.dom.setAttribute("d", d);
+                }
+                // Cập nhật các Node Phức tạp (Nhãn chữ, chấm điểm)
                 else if (["fill_node", "node_label", "draw_line_label"].includes(obj.type)) {
                     this.updateComplexObject(obj, subItem.group, currentPts);
+                }
+                // Cập nhật góc vuông / góc thường
+                else if (obj.type === "draw_right_angle" || obj.type === "draw_angle") {
+                    const p1 = currentPts[obj.p1] || {x:0, y:0};
+                    const vertex = currentPts[obj.vertex] || {x:0, y:0};
+                    const p2 = currentPts[obj.p2] || {x:0, y:0};
+                    
+                    const angleSize = 0.15;
+                    const v1x = p1.x - vertex.x, v1y = p1.y - vertex.y;
+                    const v2x = p2.x - vertex.x, v2y = p2.y - vertex.y;
+                    const len1 = Math.sqrt(v1x*v1x + v1y*v1y) || 1;
+                    const len2 = Math.sqrt(v2x*v2x + v2y*v2y) || 1;
+                    
+                    const ax = vertex.x + (v1x/len1) * angleSize;
+                    const ay = vertex.y + (v1y/len1) * angleSize;
+                    const bx = vertex.x + (v2x/len2) * angleSize;
+                    const by = vertex.y + (v2y/len2) * angleSize;
+                    const cx = ax + (bx - vertex.x);
+                    const cy = ay + (by - vertex.y);
+                    
+                    const d = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
+                    subItem.dom.setAttribute("d", d);
                 }
             });
         }
@@ -1178,6 +1602,9 @@ class MathAnimPlayer {
             dot.setAttribute("fill", fillAttrs.stroke || "#333");
             group.appendChild(dot);
             this._addTextNode(group, pt, obj.label, obj.node_options);
+            // Cập nhật lại dom reference
+            const item = this.svgElements[obj._id];
+            if (item) item.dom = dot;
         }
         else if (obj.type === "node_label") {
             this._addTextNode(group, getPt(obj.at), obj.label, obj.options);
@@ -1192,6 +1619,38 @@ class MathAnimPlayer {
             group.appendChild(line);
             const midX = (p1.x + p2.x) / 2; const midY = (p1.y + p2.y) / 2;
             this._addTextNode(group, {x: midX, y: midY}, obj.label, obj.node_options);
+            // Cập nhật lại dom reference
+            const item = this.svgElements[obj._id];
+            if (item) item.dom = line;
+        }
+        else if (obj.type === "draw_right_angle" || obj.type === "draw_angle") {
+            const p1 = getPt(obj.p1);
+            const vertex = getPt(obj.vertex);
+            const p2 = getPt(obj.p2);
+            
+            const angleSize = 0.15;
+            const v1x = p1.x - vertex.x, v1y = p1.y - vertex.y;
+            const v2x = p2.x - vertex.x, v2y = p2.y - vertex.y;
+            const len1 = Math.sqrt(v1x*v1x + v1y*v1y) || 1;
+            const len2 = Math.sqrt(v2x*v2x + v2y*v2y) || 1;
+            
+            const ax = vertex.x + (v1x/len1) * angleSize;
+            const ay = vertex.y + (v1y/len1) * angleSize;
+            const bx = vertex.x + (v2x/len2) * angleSize;
+            const by = vertex.y + (v2y/len2) * angleSize;
+            const cx = ax + (bx - vertex.x);
+            const cy = ay + (by - vertex.y);
+            
+            const d = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", d);
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke", "#333");
+            path.setAttribute("stroke-width", "1");
+            group.appendChild(path);
+            // Cập nhật lại dom reference — QUAN TRỌNG để time_shift update được
+            const item = this.svgElements[obj._id];
+            if (item) item.dom = path;
         }
     }
 
@@ -1208,8 +1667,12 @@ class MathAnimPlayer {
         }
         svgText.setAttribute("x", tx + dx); svgText.setAttribute("y", ty + dy);
         svgText.setAttribute("text-anchor", anchor); svgText.setAttribute("dominant-baseline", baseline);
-        svgText.setAttribute("font-family", "serif"); svgText.setAttribute("font-style", "italic");
-        svgText.setAttribute("font-size", "16px"); svgText.setAttribute("fill", "#000");
+        svgText.setAttribute("font-family", "'Times New Roman', Times, serif");
+        svgText.setAttribute("font-style", "italic");
+        svgText.setAttribute("font-size", "18px");
+        svgText.setAttribute("fill", "#1a1a1a");
+        svgText.setAttribute("stroke", "none");
+        svgText.setAttribute("paint-order", "fill");
         svgText.textContent = cleanText;
         group.appendChild(svgText);
     }

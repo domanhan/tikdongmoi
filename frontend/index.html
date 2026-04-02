@@ -58,6 +58,7 @@
             <div class="bg-gray-200 p-2 text-sm font-semibold text-gray-700 border-b border-gray-300 flex justify-between items-center">
                 <span><i class="fa-solid fa-display mr-1"></i> Canvas Preview</span>
                 <div class="flex gap-2">
+                    <button id="btn-refresh-canvas" class="text-gray-500 hover:text-gray-800" title="Refresh Canvas"><i class="fa-solid fa-rotate-right"></i></button>
                     <button class="text-gray-500 hover:text-gray-800" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
                     <button class="text-gray-500 hover:text-gray-800" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
                 </div>
@@ -132,29 +133,33 @@
 
     <!-- Effect Editor Modal -->
     <div id="effect-editor-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-96 p-5">
-            <h3 class="text-lg font-bold mb-4 text-gray-800"><i class="fa-solid fa-sliders text-blue-500 mr-2"></i> Edit Effect</h3>
+        <div class="bg-white rounded-lg shadow-xl w-[420px] p-5 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold mb-4 text-gray-800"><i class="fa-solid fa-sliders text-blue-500 mr-2"></i> <span id="modal-title">Edit Effect</span></h3>
             <input type="hidden" id="edit-step-idx">
             <input type="hidden" id="edit-eff-idx">
             
-            <div class="mb-4">
-                <label class="block text-xs font-bold text-gray-700 mb-1">Duration (ms)</label>
-                <input type="number" id="edit-duration" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" min="100" step="100">
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Effect Type</label>
+                <select id="edit-effect-type" class="w-full text-sm border border-gray-300 bg-white rounded px-2 py-1.5">
+                    <option value="draw">Draw</option>
+                    <option value="draw_light">Draw Light</option>
+                    <option value="draw_dashed_light">Dashed Light</option>
+                    <option value="fade_in">Fade In</option>
+                    <option value="fill">Fill</option>
+                    <option value="time_shift">Time Shift (Move)</option>
+                    <option value="change_style">Change Style</option>
+                </select>
             </div>
             
-            <div class="mb-4">
-                <label class="block text-xs font-bold text-gray-700 mb-1">Color Options (e.g. #ff0000, blue)</label>
-                <input type="text" id="edit-color" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" placeholder="Mặc định">
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Duration (ms)</label>
+                <input type="number" id="edit-duration" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" min="100" step="100">
             </div>
+            
+            <!-- Dynamic Options Container -->
+            <div id="edit-dynamic-options"></div>
 
-            <!-- Wait, different effects have different params. MVP: Just let user type a color string, fill opacity etc. or save generic object -->
-            <div class="mb-4">
-                <label class="block text-xs font-bold text-gray-700 mb-1">Extra Options (JSON format)</label>
-                <textarea id="edit-params" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono h-20" placeholder='{"opacity": 0.5, "dashed": true}'></textarea>
-                <p class="text-[10px] text-gray-500 mt-1">Ghi chú: Đối với fill có thể dùng {"fillOpacity": "0.5", "fill": "red"}. Đối với draw_dashed_light có thể chỉnh {"dashed": "5,10"}</p>
-            </div>
-
-            <div class="flex justify-end gap-2 mt-6">
+            <div class="flex justify-end gap-2 mt-5 pt-4 border-t border-gray-200">
                 <button onclick="closeEffectEditor()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm font-medium transition">Hủy</button>
                 <button onclick="saveEffectParams()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium transition">Lưu thay đổi</button>
             </div>

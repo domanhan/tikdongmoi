@@ -1,0 +1,65 @@
+# TASK: HOÀN THIỆN HIỆU ỨNG CHUYỂN ĐỘNG TOÀN CỤC (TIME-SHIFT)
+Hệ thống Timeline và Hard Reset của chúng ta đã hoạt động hoàn hảo. Bây giờ là lúc hoàn thiện hiệu ứng quan trọng nhất: `time_shift` (thay thế cho tư duy `move` cũ).
+
+# 1. BẢN CHẤT KIẾN TRÚC (BẮT BUỘC TUÂN THỦ)
+- [QUAN TRỌNG NHẤT]: JS KHÔNG LÀM TOÁN. JS không tự cộng trừ tọa độ.
+- Hiệu ứng này mang tính TOÀN CỤC (Global). Khi nó chạy, nó thao túng KHÔNG GIAN (thời gian $t$) chứ không thao túng một vật thể đơn lẻ.
+- Cơ chế: Map biến `progress` (từ 0.0 -> 1.0 của animation) thành biến thời gian `currentT` (nằm trong khoảng `t_start` và `t_end`). Từ `currentT`, tính ra `frame_index`. Sau đó lôi bộ tọa độ tại frame đó ra và ĐẮP ĐỒNG LOẠT lên TẤT CẢ thẻ SVG đang có trên sân khấu.
+
+# 2. YÊU CẦU CẬP NHẬT CODE
+Trong class `MathAnimPlayer`, tìm đến hàm `_applyEffectTick(eff, progress)`. Hãy thay thế/xóa bỏ block `else if (eff.type === "move")` cũ, và viết lại bằng block `time_shift` chuẩn xác sau:
+
+```javascript
+else if (eff.type === "time_shift" && this.frames.length > 0) {
+    // 1. Đọc khoảng thời gian t muốn quét (mặc định 0.0 đến 1.0)
+    let tStart = (eff.params && eff.params.t_start !== undefined) ? parseFloat(eff.params.t_start) : 0.0;
+    let tEnd = (eff.params && eff.params.t_end !== undefined) ? parseFloat(eff.params.t_end) : 1.0;
+    
+    // 2. Tính T hiện tại và Frame Index tương ứng
+    const currentT = tStart + progress * (tEnd - tStart);
+    const totalFrames = this.frames.length;
+    let fIndex = Math.round(currentT * (totalFrames - 1));
+    fIndex = Math.max(0, Math.min(fIndex, totalFrames - 1)); // Safecatch
+    const currentPts = this.frames[fIndex].points;
+    
+    // 3. DUYỆT QUA TẤT CẢ OBJECT ĐỂ UPDATE (Vì là hiệu ứng toàn cục)
+    this.visualObjects.forEach(obj => {
+        const subItem = this.svgElements[obj._id];
+        if (!subItem || !subItem.dom) return;
+        
+        // Tắt CSS Transition tạm thời để DOM cập nhật tọa độ liên tục không bị bóng mờ/giật lag
+        if (subItem.dom.style.transition) subItem.dom.style.transition = "none";
+
+        // Cập nhật Hình Tròn
+        if (obj.type === "draw_circle") {
+            const c = currentPts[obj.center] || {x:0, y:0};
+            subItem.dom.setAttribute("cx", this.transformX(c.x));
+            subItem.dom.setAttribute("cy", this.transformY(c.y));
+        }
+        // Cập nhật Đường thẳng / Đa giác (hỗ trợ cả draw_line và draw_lines)
+        else if (obj.type === "draw_line" || obj.type === "draw_lines") {
+            if (obj.type === "draw_line") {
+                const p1 = currentPts[obj.p1] || {x:0, y:0};
+                const p2 = currentPts[obj.p2] || {x:0, y:0};
+                subItem.dom.setAttribute("x1", this.transformX(p1.x));
+                subItem.dom.setAttribute("y1", this.transformY(p1.y));
+                subItem.dom.setAttribute("x2", this.transformX(p2.x));
+                subItem.dom.setAttribute("y2", this.transformY(p2.y));
+            } else {
+                // Đa giác nhiều điểm (polyline/polygon)
+                const mappedPts = obj.points.map(pName => currentPts[pName] || {x:0, y:0});
+                let d = "";
+                mappedPts.forEach((p, idx) => {
+                    if (idx === 0) d += `M ${this.transformX(p.x)} ${this.transformY(p.y)} `;
+                    else d += `L ${this.transformX(p.x)} ${this.transformY(p.y)} `;
+                });
+                if (obj.close_path) d += "Z";
+                subItem.dom.setAttribute("d", d);
+            }
+        }
+        // Cập nhật các Node Phức tạp (Nhãn chữ, chấm điểm)
+        else if (["fill_node", "node_label", "draw_line_label"].includes(obj.type)) {
+            this.updateComplexObject(obj, subItem.group, currentPts);
+        }
+    });
+}

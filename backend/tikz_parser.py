@@ -26,9 +26,7 @@ MATH_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     ),
     (
         "point_absolute",
-        re.compile(
-            r"\\coordinate\s*\(([^)]+)\)\s*at\s*\(([^,]+),\s*([^)]+)\)\s*;"
-        ),
+        re.compile(r"\\coordinate\s*\(([^)]+)\)\s*at\s*\(([^,]+),\s*([^)]+)\)\s*;"),
         "Diem tuyet doi",
     ),
     (
@@ -37,6 +35,14 @@ MATH_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
             r"\\path\s*\(\$\(([^)]+)\)\s*\+\s*\(([^:]+):([^)]+)\)\$\)\s*coordinate\s*\(([^)]+)\)\s*;"
         ),
         "Toa do cuc (calc)",
+    ),
+    (
+        # $(A)!k!angle:(C)$ - Nội suy xoay: từ A đi k lần đoạn AC, xoay angle độ
+        "point_rotate_interpolate",
+        re.compile(
+            r"\\path\s*\(\$\(([^)]+)\)!([^!(]+)!(-?\d+\.?\d*):?\(([^)]+)\)\$\)\s*coordinate\s*\(([^)]+)\)\s*;"
+        ),
+        "Nội suy xoay quanh điểm",
     ),
     (
         # $(A)!(B)!(C)$ - Hinh chieu vuong goc cua B len AC
@@ -66,9 +72,7 @@ MATH_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     (
         # $(expr vector)$ - Phep tinh vector tong quat (B)-(A)+(D)
         "point_calc",
-        re.compile(
-            r"\\path\s*\(\$(.+?)\$\)\s*coordinate\s*\(([^)]+)\)\s*;"
-        ),
+        re.compile(r"\\path\s*\(\$(.+?)\$\)\s*coordinate\s*\(([^)]+)\)\s*;"),
         "Bieu thuc vector tong quat",
     ),
     (
@@ -80,9 +84,7 @@ MATH_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     ),
     (
         "named_path",
-        re.compile(
-            r"\\path\s*\[name path\s*=\s*([^\]]+)\]\s*(.*?)\s*;"
-        ),
+        re.compile(r"\\path\s*\[name path\s*=\s*([^\]]+)\]\s*(.*?)\s*;"),
         "Duong dat ten",
     ),
 ]
@@ -91,9 +93,7 @@ MATH_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
 VISUAL_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     (
         "draw_circle",
-        re.compile(
-            r"\\draw\s*(?:\[(.*?)\])?\s*\(([^)]+)\)\s*circle\s*\(([^)]+)\)\s*;"
-        ),
+        re.compile(r"\\draw\s*(?:\[(.*?)\])?\s*\(([^)]+)\)\s*circle\s*\(([^)]+)\)\s*;"),
         "Ve duong tron",
     ),
     (
@@ -124,9 +124,7 @@ VISUAL_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     ),
     (
         "draw_lines",
-        re.compile(
-            r"\\draw\s*(?:\[(.*?)\])?\s*([^-;]+--[^;]+)\s*;"
-        ),
+        re.compile(r"\\draw\s*(?:\[(.*?)\])?\s*([^-;]+--[^;]+)\s*;"),
         "Ve duong (nhieu diem)",
     ),
     (
@@ -138,9 +136,7 @@ VISUAL_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     ),
     (
         "draw_arc",
-        re.compile(
-            r"\\draw\s*(?:\[(.*?)\])?\s*\(([^)]+)\)\s*arc\s*\(([^)]+)\)\s*;"
-        ),
+        re.compile(r"\\draw\s*(?:\[(.*?)\])?\s*\(([^)]+)\)\s*arc\s*\(([^)]+)\)\s*;"),
         "Cung tron",
     ),
     (
@@ -153,16 +149,12 @@ VISUAL_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     ),
     (
         "fill_shape",
-        re.compile(
-            r"\\fill\s*(?:\[(.*?)\])?\s*(.*?)\s*;"
-        ),
+        re.compile(r"\\fill\s*(?:\[(.*?)\])?\s*(.*?)\s*;"),
         "To mau",
     ),
     (
         "node_label",
-        re.compile(
-            r"\\node\s*(?:\[(.*?)\])?\s*at\s*\(([^)]+)\)\s*\{([^}]+)\}\s*;"
-        ),
+        re.compile(r"\\node\s*(?:\[(.*?)\])?\s*at\s*\(([^)]+)\)\s*\{([^}]+)\}\s*;"),
         "Nhan chu (node at)",
     ),
 ]
@@ -171,6 +163,7 @@ VISUAL_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
 # =============================================================================
 # CÁC HÀM TRÍCH XUẤT RIÊNG CHO TỪNG LOẠI
 # =============================================================================
+
 
 def _extract_math(cmd_type: str, m: re.Match) -> Dict[str, Any]:
     """Chuyển match groups thành dict AST có cấu trúc rõ ràng."""
@@ -200,11 +193,11 @@ def _extract_math(cmd_type: str, m: re.Match) -> Dict[str, Any]:
         # $(A)!(B)!(C)$ → H = projection of B onto line AC
         # groups: (line_p1, point, line_p2, id)
         return {
-            "type": "point_project",   # Dùng chung handler với point_project
+            "type": "point_project",  # Dùng chung handler với point_project
             "line_p1": g[0].strip(),
-            "point":   g[1].strip(),
+            "point": g[1].strip(),
             "line_p2": g[2].strip(),
-            "id":      g[3].strip(),
+            "id": g[3].strip(),
         }
 
     if cmd_type == "point_interpolate":
@@ -212,20 +205,31 @@ def _extract_math(cmd_type: str, m: re.Match) -> Dict[str, Any]:
         return {
             "type": cmd_type,
             "p1": g[0].strip(),
-            "k":  g[1].strip(),
+            "k": g[1].strip(),
             "p2": g[2].strip(),
             "id": g[3].strip(),
+        }
+
+    if cmd_type == "point_rotate_interpolate":
+        # $(A)!k!angle:(C)$ → từ A đi k lần đoạn AC, xoay angle độ quanh A
+        return {
+            "type": cmd_type,
+            "p1": g[0].strip(),
+            "k": g[1].strip(),
+            "angle": g[2].strip(),
+            "p2": g[3].strip(),
+            "id": g[4].strip(),
         }
 
     if cmd_type == "point_line_intersect":
         # (intersection of A--B and C--D)
         return {
-            "type":  cmd_type,
-            "l1p1":  g[0].strip(),
-            "l1p2":  g[1].strip(),
-            "l2p1":  g[2].strip(),
-            "l2p2":  g[3].strip(),
-            "id":    g[4].strip(),
+            "type": cmd_type,
+            "l1p1": g[0].strip(),
+            "l1p2": g[1].strip(),
+            "l2p1": g[2].strip(),
+            "l2p2": g[3].strip(),
+            "id": g[4].strip(),
         }
 
     if cmd_type == "point_calc":
@@ -233,7 +237,7 @@ def _extract_math(cmd_type: str, m: re.Match) -> Dict[str, Any]:
         return {
             "type": cmd_type,
             "expr": g[0].strip(),
-            "id":   g[1].strip(),
+            "id": g[1].strip(),
         }
 
     if cmd_type == "intersection":
@@ -273,9 +277,9 @@ def _extract_visual(cmd_type: str, m: re.Match) -> Dict[str, Any]:
         return {
             "type": cmd_type,
             "options": (g[0] or "").strip(),
-            "p1":     g[1].strip(),
+            "p1": g[1].strip(),
             "vertex": g[2].strip(),
-            "p2":     g[3].strip(),
+            "p2": g[3].strip(),
         }
 
     if cmd_type == "draw_angle":
@@ -283,41 +287,41 @@ def _extract_visual(cmd_type: str, m: re.Match) -> Dict[str, Any]:
         return {
             "type": cmd_type,
             "options": (g[0] or "").strip(),
-            "p1":     g[1].strip(),
+            "p1": g[1].strip(),
             "vertex": g[2].strip(),
-            "p2":     g[3].strip(),
+            "p2": g[3].strip(),
         }
 
     if cmd_type == "draw_line_label":
         # groups: options, p1, p2, node_options, label
         return {
             "type": cmd_type,
-            "options":      (g[0] or "").strip(),
-            "p1":           g[1].strip(),
-            "p2":           g[2].strip(),
+            "options": (g[0] or "").strip(),
+            "p1": g[1].strip(),
+            "p2": g[2].strip(),
             "node_options": (g[3] or "").strip(),
-            "label":        g[4].strip(),
+            "label": g[4].strip(),
         }
 
     if cmd_type == "draw_lines":
         options = (g[0] or "").strip()
         path_str = g[1].strip()
         # Parse points: split by '--'
-        parts = [p.strip() for p in path_str.split('--')]
+        parts = [p.strip() for p in path_str.split("--")]
         points = []
         close_path = False
         for p in parts:
-            if p == 'cycle':
+            if p == "cycle":
                 close_path = True
             else:
-                p = p.strip('()')
+                p = p.strip("()")
                 points.append(p)
-                
+
         return {
             "type": cmd_type,
             "options": options,
             "points": points,
-            "close_path": close_path
+            "close_path": close_path,
         }
 
     if cmd_type == "draw_line":
@@ -332,10 +336,10 @@ def _extract_visual(cmd_type: str, m: re.Match) -> Dict[str, Any]:
         # groups: options, p1, controls_expr, p2
         return {
             "type": cmd_type,
-            "options":       (g[0] or "").strip(),
-            "p1":            g[1].strip(),
+            "options": (g[0] or "").strip(),
+            "p1": g[1].strip(),
             "controls_expr": g[2].strip(),
-            "p2":            g[3].strip(),
+            "p2": g[3].strip(),
         }
 
     if cmd_type == "draw_arc":
@@ -376,6 +380,7 @@ def _extract_visual(cmd_type: str, m: re.Match) -> Dict[str, Any]:
 # =============================================================================
 # HÀM PARSE CHÍNH
 # =============================================================================
+
 
 def parse_tikz(tikz_code: str) -> Dict[str, List[Dict[str, Any]]]:
     """
@@ -445,6 +450,7 @@ def parse_tikz(tikz_code: str) -> Dict[str, List[Dict[str, Any]]]:
 # HÀM TIỆN ÍCH NỘI BỘ
 # =============================================================================
 
+
 def _collect_commands(tikz_code: str) -> List[str]:
     """
     Tách code thành danh sách lệnh đầy đủ.
@@ -511,7 +517,6 @@ def _collect_commands(tikz_code: str) -> List[str]:
     return commands
 
 
-
 def _warn_unrecognized(line_num: int, cmd: str) -> None:
     """In cảnh báo ra console nhưng không dừng quá trình parse."""
     preview = cmd[:80] + ("..." if len(cmd) > 80 else "")
@@ -521,7 +526,6 @@ def _warn_unrecognized(line_num: int, cmd: str) -> None:
         print(f"[WARN] Command #{line_num}: unrecognized")
 
 
-
 # =============================================================================
 # SELF-TEST (chạy: python tikz_parser.py)
 # =============================================================================
@@ -529,6 +533,7 @@ def _warn_unrecognized(line_num: int, cmd: str) -> None:
 if __name__ == "__main__":
     import json
     import sys
+
     # Fix encoding cho Windows terminal
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 

@@ -57,13 +57,25 @@
         <section class="flex-1 flex flex-col bg-gray-100">
             <div class="bg-gray-200 p-2 text-sm font-semibold text-gray-700 border-b border-gray-300 flex justify-between items-center">
                 <span><i class="fa-solid fa-display mr-1"></i> Canvas Preview</span>
-                <div class="flex gap-2">
+                <div class="flex items-center gap-3">
+                    <!-- Aspect Ratio Selector -->
+                    <select id="canvas-ratio" class="text-xs border border-gray-300 bg-white rounded px-2 py-1 font-medium">
+                        <option value="16:9">16:9 Landscape</option>
+                        <option value="9:16">9:16 Portrait (TikTok)</option>
+                        <option value="1:1">1:1 Square</option>
+                        <option value="free">Free (Fill)</option>
+                    </select>
+                    <!-- Dark Mode Toggle -->
+                    <button id="btn-dark-mode" class="text-gray-500 hover:text-gray-800 px-2 py-1 rounded text-xs border border-gray-300 bg-white transition" title="Toggle Dark/Light Mode">
+                        <i class="fa-solid fa-moon"></i> Dark
+                    </button>
+                    <div class="w-px h-5 bg-gray-300"></div>
                     <button id="btn-refresh-canvas" class="text-gray-500 hover:text-gray-800" title="Refresh Canvas"><i class="fa-solid fa-rotate-right"></i></button>
                     <button class="text-gray-500 hover:text-gray-800" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
                     <button class="text-gray-500 hover:text-gray-800" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
                 </div>
             </div>
-            <div class="flex-1 flex items-center justify-center relative overflow-hidden bg-white shadow-inner m-4 rounded outline outline-1 outline-gray-300" id="canvas-container">
+            <div class="flex-1 flex items-center justify-center relative overflow-hidden bg-white shadow-inner m-4 rounded outline outline-1 outline-gray-300 transition-all duration-300" id="canvas-container">
                 <!-- SVG or Canvas element will be rendered here -->
                 <div class="text-gray-400 text-center flex flex-col items-center">
                     <i class="fa-solid fa-vector-square text-5xl mb-3 opacity-50"></i>

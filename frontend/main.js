@@ -11,6 +11,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnRun = document.getElementById("btn-run");
     const tikzInput = document.getElementById("tikz-input");
     
+    // Canvas Mode State
+    window.canvasMode = { ratio: '16:9', dark: false };
+    
     // Globals for UI integration
     window.player = new MathAnimPlayer(document.getElementById("canvas-container"));
     window.visualObjects = [];
@@ -22,6 +25,31 @@ document.addEventListener("DOMContentLoaded", () => {
     btnRun.addEventListener("click", () => {
         runCode(tikzInput.value);
     });
+
+    // Canvas Ratio Selector
+    const ratioSelect = document.getElementById("canvas-ratio");
+    if (ratioSelect) {
+        ratioSelect.addEventListener("change", (e) => {
+            window.canvasMode.ratio = e.target.value;
+            applyCanvasMode();
+        });
+    }
+
+    // Dark Mode Toggle
+    const btnDark = document.getElementById("btn-dark-mode");
+    if (btnDark) {
+        btnDark.addEventListener("click", () => {
+            window.canvasMode.dark = !window.canvasMode.dark;
+            applyDarkMode();
+            // Re-render current frame
+            if (window.player && window.player.steps.length > 0) {
+                window.player.jumpToStep(window.player.currentStep);
+            }
+        });
+    }
+
+    // Initial apply
+    applyCanvasMode();
 
     const btnExportAuto = document.getElementById("btn-export-auto");
     if (btnExportAuto) {
@@ -49,6 +77,94 @@ document.addEventListener("DOMContentLoaded", () => {
 
     initStepUI();
 });
+
+function applyCanvasMode() {
+    const container = document.getElementById("canvas-container");
+    if (!container) return;
+    
+    const ratio = window.canvasMode.ratio;
+    
+    // Reset styles
+    container.style.width = '';
+    container.style.height = '';
+    container.style.maxWidth = '';
+    container.style.maxHeight = '';
+    container.style.aspectRatio = '';
+    
+    if (ratio === 'free') {
+        container.classList.add('flex-1');
+    } else {
+        container.classList.remove('flex-1');
+        if (ratio === '16:9') {
+            container.style.aspectRatio = '16/9';
+            container.style.maxWidth = '90%';
+            container.style.maxHeight = '90%';
+        } else if (ratio === '9:16') {
+            container.style.aspectRatio = '9/16';
+            container.style.maxHeight = '90%';
+            container.style.maxWidth = 'auto';
+        } else if (ratio === '1:1') {
+            container.style.aspectRatio = '1/1';
+            container.style.maxWidth = '70%';
+            container.style.maxHeight = '90%';
+        }
+    }
+}
+
+function applyDarkMode() {
+    const container = document.getElementById("canvas-container");
+    const btnDark = document.getElementById("btn-dark-mode");
+    if (!container) return;
+    
+    const isDark = window.canvasMode.dark;
+    
+    if (isDark) {
+        container.style.backgroundColor = '#0a0a0a';
+        container.style.outlineColor = '#333';
+        container.classList.remove('bg-white');
+        container.classList.add('bg-black');
+        if (btnDark) {
+            btnDark.innerHTML = '<i class="fa-solid fa-sun"></i> Light';
+            btnDark.classList.remove('text-gray-500', 'hover:text-gray-800');
+            btnDark.classList.add('text-yellow-400', 'hover:text-yellow-300');
+        }
+    } else {
+        container.style.backgroundColor = '#fff';
+        container.style.outlineColor = '';
+        container.classList.remove('bg-black');
+        container.classList.add('bg-white');
+        if (btnDark) {
+            btnDark.innerHTML = '<i class="fa-solid fa-moon"></i> Dark';
+            btnDark.classList.remove('text-yellow-400', 'hover:text-yellow-300');
+            btnDark.classList.add('text-gray-500', 'hover:text-gray-800');
+        }
+    }
+    
+    // Update player dark mode
+    if (window.player) {
+        window.player.darkMode = isDark;
+        // Update existing SVG elements
+        if (window.player.svgElements) {
+            Object.values(window.player.svgElements).forEach(item => {
+                if (item.dom) {
+                    const defaultStroke = isDark ? '#ffffff' : '#333333';
+                    const currentStroke = item.dom.getAttribute('stroke');
+                    // Only update if it's the default color
+                    if (currentStroke === '#333' || currentStroke === '#333333' || currentStroke === '#000' || currentStroke === '#000000' || currentStroke === '#ffffff' || currentStroke === '#fff') {
+                        item.dom.setAttribute('stroke', defaultStroke);
+                    }
+                }
+                // Update text elements
+                if (item.group) {
+                    const texts = item.group.querySelectorAll('text');
+                    texts.forEach(t => {
+                        t.setAttribute('fill', isDark ? '#ffffff' : '#1a1a1a');
+                    });
+                }
+            });
+        }
+    }
+}
 
 async function exportToStandaloneHTML(isAutoPlay = false) {
     if (!window.visualObjects || window.visualObjects.length === 0) {

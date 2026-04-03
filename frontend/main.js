@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const tikzInput = document.getElementById("tikz-input");
     
     // Canvas Mode State
-    window.canvasMode = { ratio: '16:9', dark: false };
+    window.canvasMode = { dark: false };
     
     // Globals for UI integration
     window.player = new MathAnimPlayer(document.getElementById("canvas-container"));
@@ -26,90 +26,68 @@ document.addEventListener("DOMContentLoaded", () => {
         runCode(tikzInput.value);
     });
 
-    // Canvas Ratio Selector
-    const ratioSelect = document.getElementById("canvas-ratio");
-    if (ratioSelect) {
-        ratioSelect.addEventListener("change", (e) => {
-            window.canvasMode.ratio = e.target.value;
-            applyCanvasMode();
-        });
-    }
-
     // Dark Mode Toggle
     const btnDark = document.getElementById("btn-dark-mode");
     if (btnDark) {
         btnDark.addEventListener("click", () => {
             window.canvasMode.dark = !window.canvasMode.dark;
             applyDarkMode();
-            // Re-render current frame
             if (window.player && window.player.steps.length > 0) {
                 window.player.jumpToStep(window.player.currentStep);
             }
         });
     }
 
-    // Initial apply
-    applyCanvasMode();
+    // Reset View Button
+    const btnResetView = document.getElementById("btn-reset-view");
+    if (btnResetView) {
+        btnResetView.addEventListener("click", () => {
+            if (window.player) {
+                window.player.resetView();
+            }
+        });
+    }
+
+    const btnCancelExport = document.getElementById("btn-cancel-export");
+    if (btnCancelExport) {
+        btnCancelExport.addEventListener("click", closeExportModal);
+    }
+    const btnConfirmExport = document.getElementById("btn-confirm-export");
+    if (btnConfirmExport) {
+        btnConfirmExport.addEventListener("click", confirmExport);
+    }
+
+    const btnCancelEffect = document.getElementById("btn-cancel-effect");
+    if (btnCancelEffect) {
+        btnCancelEffect.addEventListener("click", closeEffectEditor);
+    }
+    const btnSaveEffect = document.getElementById("btn-save-effect");
+    if (btnSaveEffect) {
+        btnSaveEffect.addEventListener("click", saveEffectParams);
+    }
 
     const btnExportAuto = document.getElementById("btn-export-auto");
     if (btnExportAuto) {
-        btnExportAuto.addEventListener("click", () => exportToStandaloneHTML(true));
+        btnExportAuto.addEventListener("click", () => openExportModal(true));
     }
     const btnExport = document.getElementById("btn-export-html");
     if (btnExport) {
-        btnExport.addEventListener("click", () => exportToStandaloneHTML(false));
+        btnExport.addEventListener("click", () => openExportModal(false));
     }
     const btnRefresh = document.getElementById("btn-refresh-canvas");
     if (btnRefresh) {
         btnRefresh.addEventListener("click", () => {
-            // Clear SVG và reset về trạng thái ban đầu
-            window.player.svg.innerHTML = "";
-            window.player.svgElements = {};
-            window.player.steps = [];
-            window.player.currentStep = -1;
+            // Chỉ reset canvas preview, giữ nguyên timeline + effects
             window.player.isPlaying = false;
             window.player.isStopRequested = false;
             if (window.player.animationFrameId) cancelAnimationFrame(window.player.animationFrameId);
-            // Re-run code để vẽ lại
+            // Re-run code để vẽ lại canvas với timeline hiện tại
             runCode(tikzInput.value);
         });
     }
 
     initStepUI();
 });
-
-function applyCanvasMode() {
-    const container = document.getElementById("canvas-container");
-    if (!container) return;
-    
-    const ratio = window.canvasMode.ratio;
-    
-    // Reset styles
-    container.style.width = '';
-    container.style.height = '';
-    container.style.maxWidth = '';
-    container.style.maxHeight = '';
-    container.style.aspectRatio = '';
-    
-    if (ratio === 'free') {
-        container.classList.add('flex-1');
-    } else {
-        container.classList.remove('flex-1');
-        if (ratio === '16:9') {
-            container.style.aspectRatio = '16/9';
-            container.style.maxWidth = '90%';
-            container.style.maxHeight = '90%';
-        } else if (ratio === '9:16') {
-            container.style.aspectRatio = '9/16';
-            container.style.maxHeight = '90%';
-            container.style.maxWidth = 'auto';
-        } else if (ratio === '1:1') {
-            container.style.aspectRatio = '1/1';
-            container.style.maxWidth = '70%';
-            container.style.maxHeight = '90%';
-        }
-    }
-}
 
 function applyDarkMode() {
     const container = document.getElementById("canvas-container");
@@ -118,47 +96,39 @@ function applyDarkMode() {
     
     const isDark = window.canvasMode.dark;
     
-    if (isDark) {
-        container.style.backgroundColor = '#0a0a0a';
-        container.style.outlineColor = '#333';
-        container.classList.remove('bg-white');
-        container.classList.add('bg-black');
-        if (btnDark) {
-            btnDark.innerHTML = '<i class="fa-solid fa-sun"></i> Light';
-            btnDark.classList.remove('text-gray-500', 'hover:text-gray-800');
-            btnDark.classList.add('text-yellow-400', 'hover:text-yellow-300');
-        }
-    } else {
-        container.style.backgroundColor = '#fff';
-        container.style.outlineColor = '';
-        container.classList.remove('bg-black');
-        container.classList.add('bg-white');
-        if (btnDark) {
-            btnDark.innerHTML = '<i class="fa-solid fa-moon"></i> Dark';
-            btnDark.classList.remove('text-yellow-400', 'hover:text-yellow-300');
-            btnDark.classList.add('text-gray-500', 'hover:text-gray-800');
-        }
+    container.style.backgroundColor = isDark ? '#0a0a0a' : '#fff';
+    container.style.outlineColor = isDark ? '#333' : '';
+    container.classList.toggle('bg-black', isDark);
+    container.classList.toggle('bg-white', !isDark);
+    
+    if (btnDark) {
+        btnDark.innerHTML = isDark 
+            ? '<i class="fa-solid fa-sun"></i> Light' 
+            : '<i class="fa-solid fa-moon"></i> Dark';
+        btnDark.classList.toggle('text-yellow-400', isDark);
+        btnDark.classList.toggle('hover:text-yellow-300', isDark);
+        btnDark.classList.toggle('text-gray-500', !isDark);
+        btnDark.classList.toggle('hover:text-gray-800', !isDark);
     }
     
-    // Update player dark mode
     if (window.player) {
         window.player.darkMode = isDark;
-        // Update existing SVG elements
         if (window.player.svgElements) {
             Object.values(window.player.svgElements).forEach(item => {
                 if (item.dom) {
-                    const defaultStroke = isDark ? '#ffffff' : '#333333';
                     const currentStroke = item.dom.getAttribute('stroke');
-                    // Only update if it's the default color
-                    if (currentStroke === '#333' || currentStroke === '#333333' || currentStroke === '#000' || currentStroke === '#000000' || currentStroke === '#ffffff' || currentStroke === '#fff') {
-                        item.dom.setAttribute('stroke', defaultStroke);
+                    const newStroke = window.player.mapStrokeForDarkMode(currentStroke, isDark);
+                    item.dom.setAttribute('stroke', newStroke);
+                    
+                    const currentFill = item.dom.getAttribute('fill');
+                    if (currentFill && currentFill !== 'none') {
+                        const newFill = window.player.mapFillForDarkMode(currentFill, isDark);
+                        item.dom.setAttribute('fill', newFill);
                     }
                 }
-                // Update text elements
                 if (item.group) {
-                    const texts = item.group.querySelectorAll('text');
-                    texts.forEach(t => {
-                        t.setAttribute('fill', isDark ? '#ffffff' : '#1a1a1a');
+                    item.group.querySelectorAll('text').forEach(t => {
+                        t.setAttribute('fill', isDark ? '#f0f0f0' : '#1a1a1a');
                     });
                 }
             });
@@ -166,11 +136,37 @@ function applyDarkMode() {
     }
 }
 
-async function exportToStandaloneHTML(isAutoPlay = false) {
+let pendingExport = null;
+
+function openExportModal(isAutoPlay) {
     if (!window.visualObjects || window.visualObjects.length === 0) {
         alert("Please run code and generate animation first!");
         return;
     }
+    pendingExport = { isAutoPlay };
+    document.getElementById('export-config-modal').classList.remove('hidden');
+}
+
+function closeExportModal() {
+    document.getElementById('export-config-modal').classList.add('hidden');
+    pendingExport = null;
+}
+
+function confirmExport() {
+    if (!pendingExport) return;
+    
+    const isAutoPlay = pendingExport.isAutoPlay;
+    const bg = document.querySelector('input[name="export-bg"]:checked').value;
+    const aspectRatio = document.getElementById('export-aspect-ratio').value;
+    const frameStyle = document.getElementById('export-frame-style').value;
+    const showGrid = document.getElementById('export-grid').checked;
+    
+    closeExportModal();
+    exportToStandaloneHTML(isAutoPlay, { bg, aspectRatio, frameStyle, showGrid });
+}
+
+async function exportToStandaloneHTML(isAutoPlay = false, options = {}) {
+    const { bg = 'white', frameStyle = 'none', showGrid = true, aspectRatio = 'free' } = options;
 
     const btnId = isAutoPlay ? "btn-export-auto" : "btn-export-html";
     const btnExport = document.getElementById(btnId);
@@ -184,19 +180,46 @@ async function exportToStandaloneHTML(isAutoPlay = false) {
             frames: window.frames,
             steps: window.player.steps
         };
-        
+
+        const bgColors = {
+            white: { body: '#ffffff', canvas: '#ffffff', gridDots: '#e5e7eb' },
+            black: { body: '#0a0a0a', canvas: '#0a0a0a', gridDots: '#333333' },
+            current: window.canvasMode.dark 
+                ? { body: '#0a0a0a', canvas: '#0a0a0a', gridDots: '#333333' }
+                : { body: '#f8fafc', canvas: '#ffffff', gridDots: '#e5e7eb' }
+        };
+        const colors = bgColors[bg] || bgColors.white;
+
+        const frameCSS = {
+            none: '',
+            thin: 'border: 1px solid #ccc;',
+            thick: 'border: 3px solid #888;',
+            rounded: 'border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);',
+            shadow: 'box-shadow: 0 8px 40px rgba(0,0,0,0.25);'
+        };
+
+        const aspectCSS = {
+            '16:9': 'aspect-ratio: 16/9; max-width: 90%; max-height: 90%; margin: auto;',
+            '9:16': 'aspect-ratio: 9/16; max-height: 90%; margin: auto;',
+            '1:1': 'aspect-ratio: 1/1; max-width: 70%; max-height: 90%; margin: auto;'
+        };
+
+        const gridCSS = showGrid ? `
+            #canvas-container::before {
+                content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+                background-image: radial-gradient(${colors.gridDots} 1px, transparent 1px);
+                background-size: 50px 50px; background-position: center; pointer-events: none; opacity: 0.5;
+            }` : '';
+
         const styleCSS = isAutoPlay ? `
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #fff; }
-        #canvas-container { width: 100%; height: 100%; position: relative; background: #fff; }
+            body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: ${colors.body}; display: flex; align-items: center; justify-content: center; }
+            #canvas-container { width: 100%; height: 100%; position: relative; background: ${colors.canvas}; ${frameCSS[frameStyle]} ${aspectCSS[aspectRatio]} }
+            ${gridCSS}
         ` : `
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #f8fafc; }
-        #canvas-container { width: 100%; height: calc(100% - 60px); position: relative; background: #fff; }
-        #canvas-container::before {
-            content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
-            background-size: 50px 50px; background-position: center; pointer-events: none; opacity: 0.5;
-        }
-        #controls { height: 60px; display: flex; align-items: center; justify-content: center; background: #1e293b; color: white; gap: 20px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 10; position: relative;}
+            body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: ${colors.body}; }
+            #canvas-container { width: 100%; height: calc(100% - 60px); position: relative; background: ${colors.canvas}; ${frameCSS[frameStyle]} ${aspectCSS[aspectRatio]} }
+            ${gridCSS}
+            #controls { height: 60px; display: flex; align-items: center; justify-content: center; background: #1e293b; color: white; gap: 20px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 10; position: relative;}
         `;
         
         const controlsHTML = isAutoPlay ? '' : `
@@ -207,24 +230,24 @@ async function exportToStandaloneHTML(isAutoPlay = false) {
         <button id="btn-next" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition"><i class="fa-solid fa-forward-step"></i> Next</button>
     </div>`;
 
+        const isDarkExport = bg === 'black' || (bg === 'current' && window.canvasMode.dark);
+
         const initScript = isAutoPlay ? `
-            // AutoPlay Logic
-            player.jumpToStep(0); // Start empty
+            player.jumpToStep(0);
             
             const startAutoPlay = () => {
                 const playNext = () => {
                     if (player.currentStep < parsedData.steps.length) {
                         player.currentStep++;
                         player.playStep(player.currentStep, () => {
-                            setTimeout(playNext, 1000); // 1s pause between steps
+                            setTimeout(playNext, 1000);
                         });
                     }
                 };
-                setTimeout(playNext, 1000); // Wait 1s before starting
+                setTimeout(playNext, 1000);
             };
             startAutoPlay();
         ` : `
-            // Step-by-Step UI Logic
             const btnPlay = document.getElementById("btn-play");
             const btnNext = document.getElementById("btn-next");
             const btnPrev = document.getElementById("btn-prev");
@@ -308,6 +331,7 @@ ${JSON.stringify(data)}
             const parsedData = JSON.parse(dataScript.textContent);
             
             const player = new MathAnimPlayer(document.getElementById("canvas-container"));
+            player.darkMode = ${isDarkExport ? 'true' : 'false'};
             player.init(parsedData.visual_objects, parsedData.frames, parsedData.steps);
             
 ${initScript}
@@ -538,6 +562,16 @@ window.renderPropDynamicOptions = (effectType) => {
         html = `
             <div class="mb-2 p-2 bg-blue-50 rounded border border-blue-200">
                 <p class="text-[10px] text-blue-600"><i class="fa-solid fa-info-circle mr-1"></i>Time Shift di chuyển tất cả đối tượng theo frames đã bake từ backend. Không cần cấu hình thêm.</p>
+            </div>
+        `;
+    } else if (effectType === 'fade_in') {
+        html = `
+            <div class="mb-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Fade Color</label>
+                <div class="flex gap-2">
+                    <input type="color" id="prop-color-picker" value="#ffffff" class="w-8 h-8 rounded cursor-pointer border border-gray-300">
+                    <input type="text" id="prop-color" class="flex-1 text-sm border border-gray-300 rounded px-2 py-1" placeholder="#ff0000, red...">
+                </div>
             </div>
         `;
     } else if (effectType === 'change_style') {
@@ -870,7 +904,9 @@ function renderStepsUI() {
                     draggable="true" 
                     data-action="edit-eff" data-step="${index}" data-eff="${effIdx}"
                     ondragstart="window.handleDragStart(event, ${index}, ${effIdx})" 
+                    ondragend="window.handleDragEnd(event)"
                     ondragover="window.handleDragOver(event)" 
+                    ondragleave="window.handleDragLeave(event)"
                     ondrop="window.handleDrop(event, ${index}, ${effIdx})">
                     <div class="flex justify-between items-center pointer-events-none">
                         <span class="font-mono text-gray-700 font-bold">${eff.target_id}</span>
@@ -895,6 +931,7 @@ function renderStepsUI() {
             <div class="px-3 py-1.5 border-b flex justify-between items-center cursor-pointer transition-colors step-header ${isActive ? 'bg-blue-100 border-blue-300' : 'bg-gray-200 border-gray-300 hover:bg-gray-300'}" 
                  data-action="select-step" data-step="${index}"
                  ondragover="window.handleDragOver(event)"
+                 ondragleave="window.handleDragLeave(event)"
                  ondrop="window.handleStepDrop(event, ${index})">
                 <div class="flex items-center gap-2 pointer-events-none">
                     <span class="font-bold ${isActive ? 'text-blue-800' : 'text-gray-700'} text-sm">Step ${stepNum}</span>
@@ -922,11 +959,30 @@ window.draggedEffect = null;
 window.handleDragStart = (e, stepIdx, effIdx) => {
     window.draggedEffect = { stepIdx, effIdx };
     e.dataTransfer.effectAllowed = 'move';
+    e.target.style.opacity = '0.4';
 };
 
 window.handleDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    const stepContainer = e.target.closest('.step-container');
+    if (stepContainer) {
+        stepContainer.classList.add('ring-2', 'ring-blue-400', 'bg-blue-50');
+    }
+};
+
+window.handleDragLeave = (e) => {
+    const stepContainer = e.target.closest('.step-container');
+    if (stepContainer) {
+        stepContainer.classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50');
+    }
+};
+
+window.handleDragEnd = (e) => {
+    e.target.style.opacity = '1';
+    document.querySelectorAll('.step-container').forEach(sc => {
+        sc.classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50');
+    });
 };
 
 window.handleDrop = (e, targetStepIdx, targetEffIdx) => {
@@ -1089,6 +1145,17 @@ window.renderEditDynamicOptions = (effectType, eff) => {
                 <input type="text" id="edit-fill-color" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="red, rgba(255,0,0,0.5)..." value="${params.fill || ''}">
             </div>
         `;
+    } else if (effectType === 'fade_in') {
+        const colorVal = eff.color || '#ffffff';
+        html = `
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1">Fade Color</label>
+                <div class="flex gap-2">
+                    <input type="color" id="edit-color-picker" value="${colorVal}" class="w-8 h-8 rounded cursor-pointer border border-gray-300">
+                    <input type="text" id="edit-color" class="flex-1 text-sm border border-gray-300 rounded px-2 py-1.5" value="${eff.color || ''}" placeholder="#ff0000, red...">
+                </div>
+            </div>
+        `;
     } else {
         html = `
             <div class="mb-3">
@@ -1144,7 +1211,7 @@ window.saveEffectParams = () => {
     let color = undefined;
     const effType = eff.type;
     
-    if (effType === 'draw' || effType === 'draw_light' || effType === 'draw_dashed_light' || effType === 'change_style') {
+    if (effType === 'draw' || effType === 'draw_light' || effType === 'draw_dashed_light' || effType === 'change_style' || effType === 'fade_in') {
         color = document.getElementById("edit-color")?.value.trim() || undefined;
         const sw = document.getElementById("edit-stroke-width")?.value;
         if (sw) params.strokeWidth = sw;
@@ -1204,10 +1271,118 @@ class MathAnimPlayer {
         // Effect layers
         this.glowLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
         this.svg.appendChild(this.glowLayer);
+        
+        // Auto-center offset
+        this.offsetX = 0;
+        this.offsetY = 0;
+        
+        // Pan & Zoom
+        this.panX = 0;
+        this.panY = 0;
+        this.zoom = 1;
+        this.isPanning = false;
+        this.lastPanX = 0;
+        this.lastPanY = 0;
+        
+        // Dark mode
+        this.darkMode = false;
     }
 
-    transformX(mathX) { return this.container.clientWidth / 2 + mathX * SCALE; }
-    transformY(mathY) { return this.container.clientHeight / 2 - mathY * SCALE; }
+    transformX(mathX) { return this.container.clientWidth / 2 + this.panX + ((mathX - this.offsetX) * SCALE * this.zoom); }
+    transformY(mathY) { return this.container.clientHeight / 2 + this.panY - ((mathY - this.offsetY) * SCALE * this.zoom); }
+
+    setupPanZoom() {
+        this.container.style.cursor = 'grab';
+        
+        this.container.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            this.isPanning = true;
+            this.lastPanX = e.clientX;
+            this.lastPanY = e.clientY;
+            this.container.style.cursor = 'grabbing';
+            e.preventDefault();
+        });
+        
+        window.addEventListener('mousemove', (e) => {
+            if (!this.isPanning) return;
+            this.panX += e.clientX - this.lastPanX;
+            this.panY += e.clientY - this.lastPanY;
+            this.lastPanX = e.clientX;
+            this.lastPanY = e.clientY;
+            this.jumpToStep(this.currentStep);
+        });
+        
+        window.addEventListener('mouseup', () => {
+            if (this.isPanning) {
+                this.isPanning = false;
+                this.container.style.cursor = 'grab';
+            }
+        });
+        
+        this.container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+            const newZoom = Math.max(0.1, Math.min(10, this.zoom * zoomFactor));
+            
+            const rect = this.container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left - rect.width / 2;
+            const mouseY = e.clientY - rect.top - rect.height / 2;
+            
+            this.panX = mouseX - (mouseX - this.panX) * (newZoom / this.zoom);
+            this.panY = mouseY - (mouseY - this.panY) * (newZoom / this.zoom);
+            this.zoom = newZoom;
+            
+            this.jumpToStep(this.currentStep);
+        }, { passive: false });
+    }
+
+    resetView() {
+        this.panX = 0;
+        this.panY = 0;
+        this.zoom = 1;
+        this.offsetX = 0;
+        this.offsetY = 0;
+        
+        if (this.frames && this.frames.length > 0) {
+            const points0 = this.frames[0].points;
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            Object.values(points0).forEach(p => {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            });
+            if (isFinite(minX)) {
+                this.offsetX = (minX + maxX) / 2;
+                this.offsetY = (minY + maxY) / 2;
+            }
+        }
+        this.jumpToStep(this.currentStep);
+    }
+
+    mapStrokeForDarkMode(color, isDark) {
+        if (!color) return isDark ? '#f0f0f0' : '#333333';
+        const darkMap = {
+            '#333': '#f0f0f0', '#333333': '#f0f0f0',
+            '#000': '#f0f0f0', '#000000': '#f0f0f0',
+            '#1a1a1a': '#f0f0f0',
+            '#3b82f6': '#60a5fa',
+            '#ef4444': '#f87171',
+            '#22c55e': '#4ade80',
+        };
+        const lightMap = {
+            '#f0f0f0': '#333333', '#ffffff': '#333333', '#fff': '#333333',
+            '#60a5fa': '#3b82f6',
+            '#f87171': '#ef4444',
+            '#4ade80': '#22c55e',
+        };
+        return isDark ? (darkMap[color] || color) : (lightMap[color] || color);
+    }
+
+    mapFillForDarkMode(color, isDark) {
+        if (!color || color === 'none') return 'none';
+        return color;
+    }
 
     init(visualObjects, frames, steps) {
         this.visualObjects = visualObjects;
@@ -1225,13 +1400,31 @@ class MathAnimPlayer {
         const points0 = frames.length > 0 ? frames[0].points : {};
         const getPt = (name) => points0[name] || { x: 0, y: 0 };
 
+        // Tính bounding box từ tất cả points để auto-center
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        Object.values(points0).forEach(p => {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+        });
+        if (isFinite(minX)) {
+            this.offsetX = (minX + maxX) / 2;
+            this.offsetY = (minY + maxY) / 2;
+        } else {
+            this.offsetX = 0;
+            this.offsetY = 0;
+        }
+
         const parseOpts = (optStr) => {
-            const attrs = { stroke: "#333", "stroke-width": "2", fill: "none" };
+            const isDark = this.darkMode;
+            const defaultStroke = isDark ? '#f0f0f0' : '#333';
+            const attrs = { stroke: defaultStroke, "stroke-width": "2", fill: "none" };
             if (!optStr) return attrs;
-            if (optStr.includes("blue")) attrs.stroke = "#3b82f6";
-            if (optStr.includes("red")) attrs.stroke = "#ef4444";
-            if (optStr.includes("green")) attrs.stroke = "#22c55e";
-            if (optStr.includes("black")) attrs.stroke = "#000000";
+            if (optStr.includes("blue")) attrs.stroke = isDark ? '#60a5fa' : '#3b82f6';
+            if (optStr.includes("red")) attrs.stroke = isDark ? '#f87171' : '#ef4444';
+            if (optStr.includes("green")) attrs.stroke = isDark ? '#4ade80' : '#22c55e';
+            if (optStr.includes("black")) attrs.stroke = isDark ? '#f0f0f0' : '#000000';
             if (optStr.includes("thick")) attrs["stroke-width"] = "3";
             if (optStr.includes("dashed")) attrs["stroke-dasharray"] = "5,5";
             return attrs;
@@ -1250,7 +1443,9 @@ class MathAnimPlayer {
                 dom = document.createElementNS("http://www.w3.org/2000/svg", "circle");
                 dom.setAttribute("cx", this.transformX(center.x));
                 dom.setAttribute("cy", this.transformY(center.y));
-                dom.setAttribute("r", r * SCALE);
+                dom.setAttribute("r", r * SCALE * this.zoom);
+                dom.setAttribute("stroke-linecap", "round");
+                dom.setAttribute("stroke-linejoin", "round");
                 const attrs = parseOpts(obj.options);
                 for (let k in attrs) dom.setAttribute(k, attrs[k]);
                 group.appendChild(dom);
@@ -1268,6 +1463,8 @@ class MathAnimPlayer {
                 
                 dom = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 dom.setAttribute("d", d);
+                dom.setAttribute("stroke-linejoin", "round");
+                dom.setAttribute("stroke-linecap", "round");
                 const attrs = parseOpts(obj.options);
                 // default if not specified
                 if (!attrs.fill && obj.close_path) attrs.fill = "none"; 
@@ -1282,6 +1479,7 @@ class MathAnimPlayer {
                 dom.setAttribute("y1", this.transformY(p1.y));
                 dom.setAttribute("x2", this.transformX(p2.x));
                 dom.setAttribute("y2", this.transformY(p2.y));
+                dom.setAttribute("stroke-linecap", "round");
                 const attrs = parseOpts(obj.options);
                 for (let k in attrs) dom.setAttribute(k, attrs[k]);
                 group.appendChild(dom);
@@ -1320,8 +1518,10 @@ class MathAnimPlayer {
                 dom = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 dom.setAttribute("d", d);
                 dom.setAttribute("fill", "none");
-                dom.setAttribute("stroke", "#333");
+                dom.setAttribute("stroke", this.darkMode ? '#f0f0f0' : '#333');
                 dom.setAttribute("stroke-width", "1");
+                dom.setAttribute("stroke-linejoin", "round");
+                dom.setAttribute("stroke-linecap", "round");
                 group.appendChild(dom);
             }
             
@@ -1340,6 +1540,8 @@ class MathAnimPlayer {
                 originalStrokeWidth: attrs["stroke-width"] || "2"
             };
         });
+        
+        this.setupPanZoom();
     }
 
     addEffect(step, target_id, effect_type, duration) {
@@ -1430,7 +1632,7 @@ class MathAnimPlayer {
             if (item.dom && item.dom.style) {
                 item.dom.style.strokeDasharray = "none"; 
                 item.dom.style.strokeDashoffset = "0";
-                item.dom.style.stroke = item.originalStroke || "#333";
+                item.dom.style.stroke = item.originalStroke || (this.darkMode ? '#f0f0f0' : '#333');
                 item.dom.setAttribute("stroke-width", item.originalStrokeWidth || "2");
                 item.dom.style.transition = "none"; // Reset transition
                 
@@ -1444,6 +1646,8 @@ class MathAnimPlayer {
                 const center = points0[obj.center] || { x: 0, y: 0 };
                 item.dom.setAttribute("cx", this.transformX(center.x));
                 item.dom.setAttribute("cy", this.transformY(center.y));
+                let r = parseFloat(obj.radius) || 1;
+                item.dom.setAttribute("r", r * SCALE * this.zoom);
             } else if (obj.type === "draw_lines") {
                 const pts = obj.points.map(pName => points0[pName] || { x: 0, y: 0 });
                 let d = "";
@@ -1536,6 +1740,16 @@ class MathAnimPlayer {
 
         if (eff.type === "fade_in") {
             item.group.style.opacity = progress.toString();
+            if (eff.color) {
+                if (item.dom) {
+                    item.dom.style.stroke = eff.color;
+                }
+                if (item.group) {
+                    item.group.querySelectorAll('text').forEach(t => {
+                        t.setAttribute('fill', eff.color);
+                    });
+                }
+            }
         }
         else if (eff.type === "fill") {
             // Apply fill color from param
@@ -1625,6 +1839,8 @@ class MathAnimPlayer {
                     const c = currentPts[obj.center] || {x:0, y:0};
                     subItem.dom.setAttribute("cx", this.transformX(c.x));
                     subItem.dom.setAttribute("cy", this.transformY(c.y));
+                    let r = parseFloat(obj.radius) || 1;
+                    subItem.dom.setAttribute("r", r * SCALE * this.zoom);
                 }
                 // Cập nhật Đường thẳng đơn (A)--(B)
                 else if (obj.type === "draw_line") {
@@ -1699,11 +1915,13 @@ class MathAnimPlayer {
         group.innerHTML = "";
         const getPt = (name) => points[name] || { x: 0, y: 0 };
         const parseOpts = (optStr) => {
-            const attrs = { stroke: "#333", "stroke-width": "2", fill: "none" };
+            const isDark = this.darkMode;
+            const defaultStroke = isDark ? '#f0f0f0' : '#333';
+            const attrs = { stroke: defaultStroke, "stroke-width": "2", fill: "none" };
             if (!optStr) return attrs;
-            if (optStr.includes("blue")) attrs.stroke = "#3b82f6";
-            if (optStr.includes("red")) attrs.stroke = "#ef4444";
-            if (optStr.includes("green")) attrs.stroke = "#22c55e";
+            if (optStr.includes("blue")) attrs.stroke = isDark ? '#60a5fa' : '#3b82f6';
+            if (optStr.includes("red")) attrs.stroke = isDark ? '#f87171' : '#ef4444';
+            if (optStr.includes("green")) attrs.stroke = isDark ? '#4ade80' : '#22c55e';
             if (optStr.includes("thick")) attrs["stroke-width"] = "3";
             return attrs;
         };
@@ -1761,8 +1979,10 @@ class MathAnimPlayer {
             const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
             path.setAttribute("d", d);
             path.setAttribute("fill", "none");
-            path.setAttribute("stroke", "#333");
+            path.setAttribute("stroke", this.darkMode ? '#f0f0f0' : '#333');
             path.setAttribute("stroke-width", "1");
+            path.setAttribute("stroke-linejoin", "round");
+            path.setAttribute("stroke-linecap", "round");
             group.appendChild(path);
             // Cập nhật lại dom reference — QUAN TRỌNG để time_shift update được
             const item = this.svgElements[obj._id];
@@ -1786,7 +2006,7 @@ class MathAnimPlayer {
         svgText.setAttribute("font-family", "'Times New Roman', Times, serif");
         svgText.setAttribute("font-style", "italic");
         svgText.setAttribute("font-size", "18px");
-        svgText.setAttribute("fill", "#1a1a1a");
+        svgText.setAttribute("fill", this.darkMode ? '#f0f0f0' : '#1a1a1a');
         svgText.setAttribute("stroke", "none");
         svgText.setAttribute("paint-order", "fill");
         svgText.textContent = cleanText;

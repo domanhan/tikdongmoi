@@ -399,8 +399,8 @@ class MathEngine:
                 )
             return
 
-        # Line: (A) -- (B)
-        line_match = re.match(r"\((\w+)\)\s+--\s+\((\w+)\)", content)
+        # Line: (A) -- (B) or (A)--(B)
+        line_match = re.match(r"\((\w+)\)\s*--\s*\((\w+)\)", content)
         if line_match:
             p1_name = line_match.group(1)
             p2_name = line_match.group(2)
@@ -620,27 +620,25 @@ class MathEngine:
         t1 = (-b - sqrt_d) / (2 * a)
         t2 = (-b + sqrt_d) / (2 * a)
 
-        intersections = []
-
-        p1 = {"x": A["x"] + t1 * dx, "y": A["y"] + t1 * dy}
-        p2 = {"x": A["x"] + t2 * dx, "y": A["y"] + t2 * dy}
-
-        # Lọc các điểm hợp lệ (t >= -1e-9)
+        # Lọc các điểm hợp lệ (t trong khoảng -10 đến 10)
+        # Cho phép tìm giao điểm trên đường thẳng mở rộng vô hạn
+        # nhưng giới hạn để tránh điểm quá xa
         def is_valid(t_val):
-            return t_val >= -1e-9
+            return -10 <= t_val <= 10
 
+        # Thu thập các điểm hợp lệ kèm tham số t
+        valid_points = []
         if is_valid(t1):
-            intersections.append(p1)
+            valid_points.append((t1, {"x": A["x"] + t1 * dx, "y": A["y"] + t1 * dy}))
         if is_valid(t2):
-            intersections.append(p2)
+            valid_points.append((t2, {"x": A["x"] + t2 * dx, "y": A["y"] + t2 * dy}))
 
-        # Sắp xếp theo khoảng cách: gần A (p1 của line) trước
-        def dist_to_a(p):
-            return math.sqrt((p["x"] - A["x"]) ** 2 + (p["y"] - A["y"]) ** 2)
+        # Sắp xếp theo tham số t: t nhỏ hơn = đến trước theo hướng M→N
+        # Điểm đầu (K) gần M hơn, điểm sau (Q) gần N hơn
+        valid_points.sort(key=lambda x: x[0])
 
-        intersections.sort(key=dist_to_a)
-
-        return intersections
+        # Trả về chỉ các điểm
+        return [p for t, p in valid_points]
 
     # -----------------------------------------------------------------------
     # Tiện ích nội bộ

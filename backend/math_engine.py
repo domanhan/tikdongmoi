@@ -38,6 +38,9 @@ class MathEngine:
                                     t_min=0.0, t_max=1.0, total_frames=60)
     """
 
+    def __init__(self):
+        self.named_paths: Dict[str, Dict[str, Any]] = {}
+
     # -----------------------------------------------------------------------
     # API công khai
     # -----------------------------------------------------------------------
@@ -65,6 +68,9 @@ class MathEngine:
         """
         # Tách riêng các node \def (hằng số / biến mở rộng)
         defs: Dict[str, str] = self._extract_defs(math_ast)
+
+        # Reset named_paths for each bake
+        self.named_paths = {}
 
         frames: List[Frame] = []
 
@@ -120,7 +126,9 @@ class MathEngine:
             "point_line_intersect": self._handle_point_line_intersect,
             "point_calc": self._handle_point_calc,
             "point_rotate_interpolate": self._handle_point_rotate_interpolate,
-            # def_time, named_path, intersection, visual → bỏ qua
+            "named_path": self._handle_named_path,
+            "intersection": self._handle_intersection,
+            # def_time, visual → bỏ qua
         }
 
         handler = handlers.get(node_type)
@@ -349,6 +357,239 @@ class MathEngine:
             ry += sign * pt["y"]
 
         points[pid] = {"x": rx, "y": ry}
+
+    def _handle_named_path(
+        self,
+        node: Dict[str, Any],
+        points: PointMap,
+        vars_table: Dict[str, float],
+    ) -> None:
+        """
+        Lưu trữ đường được đặt tên: \path [name path=circleO] (O) circle (1.5);
+
+        Hỗ trợ:
+          - Circle: (center) circle (radius)
+          - Line: (A) -- (B)
+        """
+        path_name = node.get("name", "")
+        content = node.get("content", "")
+
+        if not path_name or not content:
+            return
+
+        content = content.strip()
+
+        # Circle: (center) circle (radius)
+        circle_match = re.match(r"\((\w+)\)\s+circle\s+\(([^)]+)\)", content)
+        if circle_match:
+            center_name = circle_match.group(1)
+            radius_expr = circle_match.group(2)
+            center = points.get(center_name)
+            if center:
+                radius = self._safe_eval(radius_expr, vars_table)
+                self.named_paths[path_name] = {
+                    "type": "circle",
+                    "center": center,
+                    "radius": radius,
+                }
+            return
+
+        # Line: (A) -- (B)
+        line_match = re.match(r"\((\w+)\)\s+--\s+\((\w+)\)", content)
+        if line_match:
+            p1_name = line_match.group(1)
+            p2_name = line_match.group(2)
+            p1 = points.get(p1_name)
+            p2 = points.get(p2_name)
+            if p1 and p2:
+                self.named_paths[path_name] = {
+                    "type": "line",
+                    "p1": p1,
+                    "p2": p2,
+                }
+
+    def _handle_intersection(
+        self,
+        node: Dict[str, Any],
+        points: PointMap,
+        vars_table: Dict[str, float],
+    ) -> None:
+        """
+        Tính giao điểm của 2 đường: \path [name intersections={of=circleO and lineMN, by={P,Q}}];
+
+        Hỗ trợ:
+          - line-line: 0 hoặc 1 giao điểm
+          - line-circle: 0, 1, hoặc 2 giao điểm
+          - circle-circle: 0, 1, hoặc 2 giao điểm
+        """
+        path1_name = node.get("path1", "")
+        path2_name = node.get("path2", "")
+        result_points = node.get("points", [])
+
+        path1 = self.named_paths.get(path1_name)
+        path2 = self.named_paths.get(path2_name)
+
+        if not path1 or not path2:
+            print(
+                f"[WARN] Intersection: path '{path1_name}' or '{path2_name}' not found"
+            )
+            return
+
+        # Tính giao điểm dựa trên loại đường
+        intersections = self._compute_intersection(path1, path2)
+
+        # Gán kết quả theo thứ tự
+        for i, pid in enumerate(result_points):
+            if i < len(intersections):
+                points[pid] = intersections[i]
+
+    def _compute_intersection(
+        self,
+        path1: Dict[str, Any],
+        path2: Dict[str, Any],
+    ) -> List[Point2D]:
+        """
+        Tính giao điểm của 2 đường (unified algorithm - Phương án 2).
+
+        Returns:
+            List of 0, 1, or 2 intersection points.
+        """
+        t1 = path1.get("type")
+        t2 = path2.get("type")
+
+        if t1 == "line" and t2 == "line":
+            return self._line_line_intersection(path1, path2)
+        elif t1 == "circle" and t2 == "circle":
+            return self._circle_circle_intersection(path1, path2)
+        elif t1 == "line" and t2 == "circle":
+            return self._line_circle_intersection(path1, path2)
+        elif t1 == "circle" and t2 == "line":
+            return self._line_circle_intersection(path2, path1)
+
+        return []
+
+    def _line_line_intersection(
+        self,
+        line1: Dict[str, Any],
+        line2: Dict[str, Any],
+    ) -> List[Point2D]:
+        """Giao điểm 2 đường thẳng."""
+        A = line1["p1"]
+        B = line1["p2"]
+        C = line2["p1"]
+        D = line2["p2"]
+
+        dx1 = B["x"] - A["x"]
+        dy1 = B["y"] - A["y"]
+        dx2 = D["x"] - C["x"]
+        dy2 = D["y"] - C["y"]
+
+        denom = dx1 * dy2 - dy1 * dx2
+        if abs(denom) < 1e-12:
+            return []  # Song song
+
+        t = ((C["x"] - A["x"]) * dy2 - (C["y"] - A["y"]) * dx2) / denom
+        x = A["x"] + t * dx1
+        y = A["y"] + t * dy1
+
+        return [{"x": x, "y": y}]
+
+    def _circle_circle_intersection(
+        self,
+        circle1: Dict[str, Any],
+        circle2: Dict[str, Any],
+    ) -> List[Point2D]:
+        """Giao điểm 2 đường tròn."""
+        c1 = circle1["center"]
+        r1 = circle1["radius"]
+        c2 = circle2["center"]
+        r2 = circle2["radius"]
+
+        dx = c2["x"] - c1["x"]
+        dy = c2["y"] - c1["y"]
+        d = math.sqrt(dx * dx + dy * dy)
+
+        if d > r1 + r2:
+            return []  # Không giao
+        if d < abs(r1 - r2):
+            return []  # Một đường tròn trong another
+        if abs(d) < 1e-12:
+            return []  # Trùng tâm
+
+        a = (r1 * r1 - r2 * r2 + d * d) / (2 * d)
+        h = math.sqrt(max(0, r1 * r1 - a * a))
+
+        cx = c1["x"] + a * dx / d
+        cy = c1["y"] + a * dy / d
+
+        if abs(h) < 1e-12:
+            return [{"x": cx, "y": cy}]
+
+        return [
+            {"x": cx + h * dy / d, "y": cy - h * dx / d},
+            {"x": cx - h * dy / d, "y": cy + h * dx / d},
+        ]
+
+    def _line_circle_intersection(
+        self,
+        line: Dict[str, Any],
+        circle: Dict[str, Any],
+    ) -> List[Point2D]:
+        """
+        Giao điểm đường thẳng - đường tròn.
+
+        Thuật toán: Giải phương trình bậc 2.
+        Thứ tự: Gần p1 của line = điểm đầu, gần p2 = điểm sau.
+        """
+        A = line["p1"]
+        B = line["p2"]
+        C = circle["center"]
+        r = circle["radius"]
+
+        dx = B["x"] - A["x"]
+        dy = B["y"] - A["y"]
+
+        fx = A["x"] - C["x"]
+        fy = A["y"] - C["y"]
+
+        a = dx * dx + dy * dy
+        b = 2 * (fx * dx + fy * dy)
+        c = fx * fx + fy * fy - r * r
+
+        discriminant = b * b - 4 * a * c
+
+        if discriminant < 0:
+            return []
+
+        sqrt_d = math.sqrt(discriminant)
+
+        if abs(a) < 1e-12:
+            return []
+
+        t1 = (-b - sqrt_d) / (2 * a)
+        t2 = (-b + sqrt_d) / (2 * a)
+
+        intersections = []
+
+        p1 = {"x": A["x"] + t1 * dx, "y": A["y"] + t1 * dy}
+        p2 = {"x": A["x"] + t2 * dx, "y": A["y"] + t2 * dy}
+
+        # Lọc các điểm hợp lệ (t >= -1e-9)
+        def is_valid(t_val):
+            return t_val >= -1e-9
+
+        if is_valid(t1):
+            intersections.append(p1)
+        if is_valid(t2):
+            intersections.append(p2)
+
+        # Sắp xếp theo khoảng cách: gần A (p1 của line) trước
+        def dist_to_a(p):
+            return math.sqrt((p["x"] - A["x"]) ** 2 + (p["y"] - A["y"]) ** 2)
+
+        intersections.sort(key=dist_to_a)
+
+        return intersections
 
     # -----------------------------------------------------------------------
     # Tiện ích nội bộ

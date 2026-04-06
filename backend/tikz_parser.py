@@ -274,22 +274,50 @@ def _extract_visual(cmd_type: str, m: re.Match) -> Dict[str, Any]:
 
     if cmd_type == "draw_right_angle":
         # groups: options, p1, vertex, p2
+        opts = (g[0] or "").strip()
+        # Extract angle radius from options (e.g. "draw, angle radius=2mm")
+        radius_match = re.search(r"angle\s*radius\s*=\s*([\d.]+)\s*(mm|pt|cm)?", opts)
+        radius_mm = 2.0  # default
+        if radius_match:
+            val = float(radius_match.group(1))
+            unit = radius_match.group(2) or "mm"
+            if unit == "pt":
+                radius_mm = val * 0.3528  # 1pt ≈ 0.3528mm
+            elif unit == "cm":
+                radius_mm = val * 10
+            else:
+                radius_mm = val
         return {
             "type": cmd_type,
-            "options": (g[0] or "").strip(),
+            "options": opts,
             "p1": g[1].strip(),
             "vertex": g[2].strip(),
             "p2": g[3].strip(),
+            "radius_mm": radius_mm,
         }
 
     if cmd_type == "draw_angle":
         # groups: options, p1, vertex, p2
+        opts = (g[0] or "").strip()
+        # Extract angle radius from options
+        radius_match = re.search(r"angle\s*radius\s*=\s*([\d.]+)\s*(mm|pt|cm)?", opts)
+        radius_mm = 2.0  # default
+        if radius_match:
+            val = float(radius_match.group(1))
+            unit = radius_match.group(2) or "mm"
+            if unit == "pt":
+                radius_mm = val * 0.3528
+            elif unit == "cm":
+                radius_mm = val * 10
+            else:
+                radius_mm = val
         return {
             "type": cmd_type,
-            "options": (g[0] or "").strip(),
+            "options": opts,
             "p1": g[1].strip(),
             "vertex": g[2].strip(),
             "p2": g[3].strip(),
+            "radius_mm": radius_mm,
         }
 
     if cmd_type == "draw_line_label":
@@ -442,6 +470,13 @@ def parse_tikz(tikz_code: str) -> Dict[str, List[Dict[str, Any]]]:
                 f"Lỗi cú pháp tại Lệnh thứ {cmd_idx + 1}: {exc}\n"
                 f"  >> Nội dung lệnh: {cmd[:120]}"
             ) from exc
+
+    # Debug: log góc
+    for vo in visual_objects:
+        if "angle" in vo.get("type", ""):
+            print(
+                f"[DEBUG ANGLE] type={vo['type']} p1={vo.get('p1')} vertex={vo.get('vertex')} p2={vo.get('p2')} radius={vo.get('radius_mm')} opts={vo.get('options')}"
+            )
 
     return {"math_ast": math_ast, "visual_objects": visual_objects}
 

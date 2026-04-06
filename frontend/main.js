@@ -74,6 +74,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnExport) {
         btnExport.addEventListener("click", () => openExportModal(false));
     }
+
+    const btnExportVideo = document.getElementById("btn-export-video");
+    if (btnExportVideo) {
+        btnExportVideo.addEventListener("click", () => openVideoExportModal());
+    }
+
+    const btnCancelVideo = document.getElementById("btn-cancel-video");
+    if (btnCancelVideo) {
+        btnCancelVideo.addEventListener("click", closeVideoExportModal);
+    }
+    const btnConfirmVideo = document.getElementById("btn-confirm-video");
+    if (btnConfirmVideo) {
+        btnConfirmVideo.addEventListener("click", confirmVideoExport);
+    }
+
     const btnRefresh = document.getElementById("btn-refresh-canvas");
     if (btnRefresh) {
         btnRefresh.addEventListener("click", () => {
@@ -357,6 +372,213 @@ ${initScript}
 
     btnExport.innerHTML = originalText;
     btnExport.disabled = false;
+}
+
+// ===== VIDEO EXPORT =====
+// ===== VIDEO EXPORT (WebM) =====
+
+function openVideoExportModal() {
+    if (!window.visualObjects || window.visualObjects.length === 0) {
+        alert("Please run code and generate animation first!");
+        return;
+    }
+    if (!window.player.steps || window.player.steps.length === 0) {
+        alert("Please add at least one step with effects!");
+        return;
+    }
+    document.getElementById('video-export-modal').classList.remove('hidden');
+    document.getElementById('video-progress').classList.add('hidden');
+    document.getElementById('btn-confirm-video').disabled = false;
+}
+
+function closeVideoExportModal() {
+    document.getElementById('video-export-modal').classList.add('hidden');
+}
+
+function updateVideoProgress(text, percent) {
+    document.getElementById('video-progress').classList.remove('hidden');
+    document.getElementById('video-progress-text').textContent = text;
+    document.getElementById('video-progress-bar').style.width = percent + '%';
+}
+
+async function confirmVideoExport() {
+    const aspectRatio = document.getElementById('video-aspect-ratio').value;
+    const bg = document.querySelector('input[name="video-bg"]:checked').value;
+    
+    document.getElementById('btn-confirm-video').disabled = true;
+    
+    try {
+        updateVideoProgress("Đang ghi hình...", 10);
+        const webmBlob = await recordAnimationToWebM(aspectRatio, bg);
+        
+        updateVideoProgress("Hoàn tất! Đang download...", 100);
+        
+        const url = URL.createObjectURL(webmBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `mathanim_${aspectRatio.replace(':', 'x')}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        setTimeout(() => closeVideoExportModal(), 1000);
+    } catch (err) {
+        console.error("Video Export Error:", err);
+        alert("Export video thất bại: " + err.message);
+        closeVideoExportModal();
+    }
+}
+
+async function recordAnimationToWebM(aspectRatio, bg) {
+    const dims = {
+        '9:16': { width: 1080, height: 1920 },
+        '16:9': { width: 1920, height: 1080 },
+        '1:1': { width: 1080, height: 1080 }
+    };
+    const { width, height } = dims[aspectRatio] || dims['9:16'];
+    const bgColor = bg === 'black' ? '#0a0a0a' : '#ffffff';
+    
+    if (typeof MediaRecorder === 'undefined') {
+        throw new Error("Trình duyệt này không hỗ trợ MediaRecorder. Vui lòng dùng Chrome hoặc Edge phiên bản mới nhất.");
+    }
+    if (typeof html2canvas === 'undefined') {
+        throw new Error("html2canvas chưa load. Vui lòng refresh trang và thử lại.");
+    }
+    
+    // Create hidden container with cloned SVG
+    const hiddenDiv = document.createElement('div');
+    hiddenDiv.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${width}px;height:${height}px;overflow:hidden;background:${bgColor};`;
+    document.body.appendChild(hiddenDiv);
+    
+    // Clone the SVG
+    const svgClone = window.player.svg.cloneNode(true);
+    svgClone.setAttribute('width', width);
+    svgClone.setAttribute('height', height);
+    svgClone.style.width = '100%';
+    svgClone.style.height = '100%';
+    hiddenDiv.appendChild(svgClone);
+    
+    // Create a temporary player for the hidden SVG
+    const tempPlayer = new MathAnimPlayer(hiddenDiv);
+    tempPlayer.darkMode = window.player.darkMode;
+    tempPlayer.init(window.visualObjects, window.frames, window.player.steps);
+    
+    // Create canvas for recording
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error("Cannot create canvas 2D context");
+    
+    // Setup MediaRecorder
+    const fps = 30;
+    const stream = canvas.captureStream(fps);
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
+        ? 'video/webm;codecs=vp9' 
+        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+            ? 'video/webm;codecs=vp8'
+            : 'video/webm';
+    
+    const recorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 8_000_000
+    });
+    
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    
+    const recordingDone = new Promise((resolve) => {
+        recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+    });
+    
+    // Calculate total animation duration
+    const steps = window.player.steps;
+    let totalDuration = 0;
+    for (const stepEffects of steps) {
+        let maxStepDuration = 0;
+        for (const eff of stepEffects) {
+            maxStepDuration = Math.max(maxStepDuration, eff.duration || 1000);
+        }
+        totalDuration += maxStepDuration + 1000;
+    }
+    if (totalDuration === 0) totalDuration = 3000;
+    
+    // Start recording
+    recorder.start();
+    
+    // Play animation step by step on the hidden player
+    tempPlayer.jumpToStep(0);
+    
+    const startTime = performance.now();
+    let currentStep = 0;
+    let stepStartTime = startTime;
+    let animationComplete = false;
+    
+    await new Promise((resolve) => {
+        async function renderFrame() {
+            const elapsed = performance.now() - startTime;
+            
+            // Use html2canvas to capture the hidden div
+            try {
+                const capturedCanvas = await html2canvas(hiddenDiv, {
+                    backgroundColor: bgColor,
+                    scale: 1,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true,
+                });
+                
+                // Draw captured frame onto our recording canvas
+                ctx.drawImage(capturedCanvas, 0, 0, width, height);
+            } catch (e) {
+                console.warn("html2canvas error:", e);
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, width, height);
+            }
+            
+            // Advance to next step if needed
+            if (currentStep < steps.length && !animationComplete) {
+                let stepDuration = 0;
+                for (const eff of steps[currentStep]) {
+                    stepDuration = Math.max(stepDuration, eff.duration || 1000);
+                }
+                stepDuration += 1000;
+                
+                if (elapsed - stepStartTime >= stepDuration) {
+                    currentStep++;
+                    stepStartTime = performance.now();
+                    if (currentStep < steps.length) {
+                        tempPlayer.jumpToStep(currentStep);
+                        tempPlayer.playStep(currentStep + 1, () => {});
+                    } else {
+                        animationComplete = true;
+                    }
+                }
+            }
+            
+            // Check if done
+            if (animationComplete && elapsed >= totalDuration + 500) {
+                recorder.stop();
+                resolve();
+                return;
+            }
+            
+            if (elapsed >= totalDuration + 2000) {
+                recorder.stop();
+                resolve();
+                return;
+            }
+            
+            requestAnimationFrame(renderFrame);
+        }
+        requestAnimationFrame(renderFrame);
+    });
+    
+    // Cleanup
+    document.body.removeChild(hiddenDiv);
+    
+    return recordingDone;
 }
 
 async function runCode(code) {
@@ -1489,39 +1711,84 @@ class MathAnimPlayer {
                 this.updateComplexObject(obj, group, points0);
                 dom = group; 
             }
-            else if (obj.type === "draw_right_angle" || obj.type === "draw_angle") {
-                // Góc vuông / góc thường - vẽ path hình chữ L nhỏ
+            else if (obj.type === "draw_right_angle") {
+                // Góc vuông - L-shape (2 đoạn thẳng)
                 const p1 = getPt(obj.p1);
                 const vertex = getPt(obj.vertex);
                 const p2 = getPt(obj.p2);
                 
-                const size = 2; // 2mm ≈ 0.15 unit, dùng fixed 0.15
                 const angleSize = 0.15;
-                
-                // Vector từ vertex đến p1 và p2
                 const v1x = p1.x - vertex.x, v1y = p1.y - vertex.y;
                 const v2x = p2.x - vertex.x, v2y = p2.y - vertex.y;
                 const len1 = Math.sqrt(v1x*v1x + v1y*v1y) || 1;
                 const len2 = Math.sqrt(v2x*v2x + v2y*v2y) || 1;
                 
-                // Điểm trên 2 cạnh cách vertex một khoảng angleSize
                 const ax = vertex.x + (v1x/len1) * angleSize;
                 const ay = vertex.y + (v1y/len1) * angleSize;
                 const bx = vertex.x + (v2x/len2) * angleSize;
                 const by = vertex.y + (v2y/len2) * angleSize;
-                
-                // Điểm góc vuông
                 const cx = ax + (bx - vertex.x);
                 const cy = ay + (by - vertex.y);
                 
-                const d = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
+                // LUÔN tạo path sector (có vertex) để fill effect hoạt động đúng
+                const d = `M ${this.transformX(vertex.x)} ${this.transformY(vertex.y)} L ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)} Z`;
+                
                 dom = document.createElementNS("http://www.w3.org/2000/svg", "path");
                 dom.setAttribute("d", d);
-                dom.setAttribute("fill", "none");
+                dom.setAttribute("fill", "none"); // Mặc định không fill
                 dom.setAttribute("stroke", this.darkMode ? '#f0f0f0' : '#333');
-                dom.setAttribute("stroke-width", "1");
+                dom.setAttribute("stroke-width", "1.5");
                 dom.setAttribute("stroke-linejoin", "round");
                 dom.setAttribute("stroke-linecap", "round");
+                // Lưu path gốc (chỉ L-shape, không có vertex) để restore khi cần
+                dom.setAttribute("data-lpath", `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`);
+                dom.setAttribute("data-fpath", d);
+                group.appendChild(dom);
+            }
+            else if (obj.type === "draw_angle") {
+                // Góc thường - cung tròn mềm mại
+                const p1 = getPt(obj.p1);
+                const vertex = getPt(obj.vertex);
+                const p2 = getPt(obj.p2);
+                
+                const radiusMm = parseFloat(obj.radius_mm) || 2.0;
+                const radiusUnits = (radiusMm / 25.4) * 2;
+                
+                const v1x = p1.x - vertex.x, v1y = p1.y - vertex.y;
+                const v2x = p2.x - vertex.x, v2y = p2.y - vertex.y;
+                const len1 = Math.sqrt(v1x*v1x + v1y*v1y) || 1;
+                const len2 = Math.sqrt(v2x*v2x + v2y*v2y) || 1;
+                
+                const angle1 = Math.atan2(v1y / len1, v1x / len1);
+                const angle2 = Math.atan2(v2y / len2, v2x / len2);
+                
+                const ax = vertex.x + radiusUnits * Math.cos(angle1);
+                const ay = vertex.y + radiusUnits * Math.sin(angle1);
+                const bx = vertex.x + radiusUnits * Math.cos(angle2);
+                const by = vertex.y + radiusUnits * Math.sin(angle2);
+                
+                let angleDiff = angle2 - angle1;
+                while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+                const largeArc = Math.abs(angleDiff) > Math.PI ? 1 : 0;
+                const sweep = angleDiff > 0 ? 0 : 1;
+                
+                const rxPx = Math.abs(this.transformX(vertex.x + radiusUnits) - this.transformX(vertex.x));
+                const ryPx = Math.abs(this.transformY(vertex.y) - this.transformY(vertex.y + radiusUnits));
+                
+                // LUÔN tạo path sector (có vertex) để fill effect hoạt động đúng
+                const fPath = `M ${this.transformX(vertex.x)} ${this.transformY(vertex.y)} L ${this.transformX(ax)} ${this.transformY(ay)} A ${rxPx} ${ryPx} 0 ${largeArc} ${sweep} ${this.transformX(bx)} ${this.transformY(by)} Z`;
+                const dPath = `M ${this.transformX(ax)} ${this.transformY(ay)} A ${rxPx} ${ryPx} 0 ${largeArc} ${sweep} ${this.transformX(bx)} ${this.transformY(by)}`;
+                
+                dom = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                dom.setAttribute("d", fPath);
+                dom.setAttribute("fill", "none"); // Mặc định không fill
+                dom.setAttribute("stroke", this.darkMode ? '#f0f0f0' : '#333');
+                dom.setAttribute("stroke-width", "1.5");
+                dom.setAttribute("stroke-linejoin", "round");
+                dom.setAttribute("stroke-linecap", "round");
+                dom.setAttribute("data-lpath", dPath);
+                dom.setAttribute("data-fpath", fPath);
                 group.appendChild(dom);
             }
             
@@ -1753,13 +2020,21 @@ class MathAnimPlayer {
         }
         else if (eff.type === "fill") {
             // Apply fill color from param
-            const fillColor = eff.color || "rgba(169, 177, 214, 0.5)"; // Default from reference
+            const fillColor = eff.color || "rgba(169, 177, 214, 0.5)";
             let opacity = 1.0;
             if (eff.params && eff.params.opacity) opacity = parseFloat(eff.params.opacity);
             item.group.style.opacity = (progress * opacity).toString();
             
-            // if it's a circle or something we might need to set fill
             if (item.dom) {
+                // For angle types: switch to fill path (sector/quadrilateral)
+                const obj = item.obj;
+                if (obj && (obj.type === "draw_right_angle" || obj.type === "draw_angle")) {
+                    const fPath = item.dom.getAttribute("data-fpath");
+                    if (fPath) {
+                        item.dom.setAttribute("d", fPath);
+                    }
+                }
+                
                 // To preserve stroke vs fill
                 if (!item.dom.getAttribute('data-origin-fill')) {
                     item.dom.setAttribute('data-origin-fill', item.dom.getAttribute('fill') || 'none');
@@ -1866,8 +2141,8 @@ class MathAnimPlayer {
                 else if (["fill_node", "node_label", "draw_line_label"].includes(obj.type)) {
                     this.updateComplexObject(obj, subItem.group, currentPts);
                 }
-                // Cập nhật góc vuông / góc thường
-                else if (obj.type === "draw_right_angle" || obj.type === "draw_angle") {
+                // Cập nhật góc vuông
+                else if (obj.type === "draw_right_angle") {
                     const p1 = currentPts[obj.p1] || {x:0, y:0};
                     const vertex = currentPts[obj.vertex] || {x:0, y:0};
                     const p2 = currentPts[obj.p2] || {x:0, y:0};
@@ -1885,8 +2160,53 @@ class MathAnimPlayer {
                     const cx = ax + (bx - vertex.x);
                     const cy = ay + (by - vertex.y);
                     
-                    const d = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
-                    subItem.dom.setAttribute("d", d);
+                    const fPath = `M ${this.transformX(vertex.x)} ${this.transformY(vertex.y)} L ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)} Z`;
+                    const lPath = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
+                    
+                    subItem.dom.setAttribute("data-fpath", fPath);
+                    subItem.dom.setAttribute("data-lpath", lPath);
+                    // Keep current d (fill effect may have set it to fPath)
+                    const isFillActive = subItem.dom.getAttribute("data-origin-fill");
+                    subItem.dom.setAttribute("d", isFillActive ? fPath : lPath);
+                }
+                // Cập nhật góc thường (cung tròn)
+                else if (obj.type === "draw_angle") {
+                    const p1 = currentPts[obj.p1] || {x:0, y:0};
+                    const vertex = currentPts[obj.vertex] || {x:0, y:0};
+                    const p2 = currentPts[obj.p2] || {x:0, y:0};
+                    
+                    const radiusMm = parseFloat(obj.radius_mm) || 2.0;
+                    const radiusUnits = (radiusMm / 25.4) * 2;
+                    
+                    const v1x = p1.x - vertex.x, v1y = p1.y - vertex.y;
+                    const v2x = p2.x - vertex.x, v2y = p2.y - vertex.y;
+                    const len1 = Math.sqrt(v1x*v1x + v1y*v1y) || 1;
+                    const len2 = Math.sqrt(v2x*v2x + v2y*v2y) || 1;
+                    
+                    const angle1 = Math.atan2(v1y / len1, v1x / len1);
+                    const angle2 = Math.atan2(v2y / len2, v2x / len2);
+                    
+                    const ax = vertex.x + radiusUnits * Math.cos(angle1);
+                    const ay = vertex.y + radiusUnits * Math.sin(angle1);
+                    const bx = vertex.x + radiusUnits * Math.cos(angle2);
+                    const by = vertex.y + radiusUnits * Math.sin(angle2);
+                    
+                    let angleDiff = angle2 - angle1;
+                    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+                    const largeArc = Math.abs(angleDiff) > Math.PI ? 1 : 0;
+                    const sweep = angleDiff > 0 ? 0 : 1;
+                    
+                    const rxPx = Math.abs(this.transformX(vertex.x + radiusUnits) - this.transformX(vertex.x));
+                    const ryPx = Math.abs(this.transformY(vertex.y) - this.transformY(vertex.y + radiusUnits));
+                    
+                    const fPath = `M ${this.transformX(vertex.x)} ${this.transformY(vertex.y)} L ${this.transformX(ax)} ${this.transformY(ay)} A ${rxPx} ${ryPx} 0 ${largeArc} ${sweep} ${this.transformX(bx)} ${this.transformY(by)} Z`;
+                    const lPath = `M ${this.transformX(ax)} ${this.transformY(ay)} A ${rxPx} ${ryPx} 0 ${largeArc} ${sweep} ${this.transformX(bx)} ${this.transformY(by)}`;
+                    
+                    subItem.dom.setAttribute("data-fpath", fPath);
+                    subItem.dom.setAttribute("data-lpath", lPath);
+                    const isFillActive = subItem.dom.getAttribute("data-origin-fill");
+                    subItem.dom.setAttribute("d", isFillActive ? fPath : lPath);
                 }
             });
         }
@@ -1897,7 +2217,6 @@ class MathAnimPlayer {
         if (!item) return;
 
         if (eff.type === "draw_dashed_light") {
-            // Turn solid after done
             let makeSolid = true;
             if (eff.params && eff.params.keepDashed) makeSolid = false;
             if (makeSolid && item.dom) item.dom.style.strokeDasharray = "none";
@@ -1905,6 +2224,11 @@ class MathAnimPlayer {
         if (eff.type === "change_style") {
             if (item.dom) item.dom.style.transition = "none";
             eff._styleApplied = false;
+        }
+        if (eff.type === "fill") {
+            // Không restore về lPath nữa - giữ fill state cho góc
+            // Chỉ cleanup nếu effect bị cancel giữa chừng (progress < 1.0)
+            // Fill sẽ được giữ lại như trạng thái cuối cùng
         }
         if (eff.spark) {
             eff.spark.remove();
@@ -1957,7 +2281,7 @@ class MathAnimPlayer {
             const item = this.svgElements[obj._id];
             if (item) item.dom = line;
         }
-        else if (obj.type === "draw_right_angle" || obj.type === "draw_angle") {
+        else if (obj.type === "draw_right_angle") {
             const p1 = getPt(obj.p1);
             const vertex = getPt(obj.vertex);
             const p2 = getPt(obj.p2);
@@ -1975,17 +2299,74 @@ class MathAnimPlayer {
             const cx = ax + (bx - vertex.x);
             const cy = ay + (by - vertex.y);
             
-            const d = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
+            const fPath = `M ${this.transformX(vertex.x)} ${this.transformY(vertex.y)} L ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)} Z`;
+            const lPath = `M ${this.transformX(ax)} ${this.transformY(ay)} L ${this.transformX(cx)} ${this.transformY(cy)} L ${this.transformX(bx)} ${this.transformY(by)}`;
+            
+            const item = this.svgElements[obj._id];
+            const isFillActive = item && item.dom && item.dom.getAttribute("data-origin-fill");
+            const fillColor = isFillActive ? item.dom.getAttribute("fill") : "none";
+            
             const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("d", d);
-            path.setAttribute("fill", "none");
+            path.setAttribute("d", isFillActive ? fPath : lPath);
+            path.setAttribute("fill", fillColor);
             path.setAttribute("stroke", this.darkMode ? '#f0f0f0' : '#333');
-            path.setAttribute("stroke-width", "1");
+            path.setAttribute("stroke-width", "1.5");
             path.setAttribute("stroke-linejoin", "round");
             path.setAttribute("stroke-linecap", "round");
+            path.setAttribute("data-lpath", lPath);
+            path.setAttribute("data-fpath", fPath);
+            if (isFillActive) path.setAttribute("data-origin-fill", isFillActive);
             group.appendChild(path);
-            // Cập nhật lại dom reference — QUAN TRỌNG để time_shift update được
+            if (item) item.dom = path;
+        }
+        else if (obj.type === "draw_angle") {
+            const p1 = getPt(obj.p1);
+            const vertex = getPt(obj.vertex);
+            const p2 = getPt(obj.p2);
+            
+            const radiusMm = parseFloat(obj.radius_mm) || 2.0;
+            const radiusUnits = (radiusMm / 25.4) * 2;
+            
+            const v1x = p1.x - vertex.x, v1y = p1.y - vertex.y;
+            const v2x = p2.x - vertex.x, v2y = p2.y - vertex.y;
+            const len1 = Math.sqrt(v1x*v1x + v1y*v1y) || 1;
+            const len2 = Math.sqrt(v2x*v2x + v2y*v2y) || 1;
+            
+            const angle1 = Math.atan2(v1y / len1, v1x / len1);
+            const angle2 = Math.atan2(v2y / len2, v2x / len2);
+            
+            const ax = vertex.x + radiusUnits * Math.cos(angle1);
+            const ay = vertex.y + radiusUnits * Math.sin(angle1);
+            const bx = vertex.x + radiusUnits * Math.cos(angle2);
+            const by = vertex.y + radiusUnits * Math.sin(angle2);
+            
+            let angleDiff = angle2 - angle1;
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+            const largeArc = Math.abs(angleDiff) > Math.PI ? 1 : 0;
+            const sweep = angleDiff > 0 ? 0 : 1;
+            
+            const rxPx = Math.abs(this.transformX(vertex.x + radiusUnits) - this.transformX(vertex.x));
+            const ryPx = Math.abs(this.transformY(vertex.y) - this.transformY(vertex.y + radiusUnits));
+            
+            const fPath = `M ${this.transformX(vertex.x)} ${this.transformY(vertex.y)} L ${this.transformX(ax)} ${this.transformY(ay)} A ${rxPx} ${ryPx} 0 ${largeArc} ${sweep} ${this.transformX(bx)} ${this.transformY(by)} Z`;
+            const lPath = `M ${this.transformX(ax)} ${this.transformY(ay)} A ${rxPx} ${ryPx} 0 ${largeArc} ${sweep} ${this.transformX(bx)} ${this.transformY(by)}`;
+            
             const item = this.svgElements[obj._id];
+            const isFillActive = item && item.dom && item.dom.getAttribute("data-origin-fill");
+            const fillColor = isFillActive ? item.dom.getAttribute("fill") : "none";
+            
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", isFillActive ? fPath : lPath);
+            path.setAttribute("fill", fillColor);
+            path.setAttribute("stroke", this.darkMode ? '#f0f0f0' : '#333');
+            path.setAttribute("stroke-width", "1.5");
+            path.setAttribute("stroke-linejoin", "round");
+            path.setAttribute("stroke-linecap", "round");
+            path.setAttribute("data-lpath", lPath);
+            path.setAttribute("data-fpath", fPath);
+            if (isFillActive) path.setAttribute("data-origin-fill", isFillActive);
+            group.appendChild(path);
             if (item) item.dom = path;
         }
     }

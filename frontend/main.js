@@ -7,6 +7,17 @@
 const API_URL = "http://localhost:8000/api/bake";
 const SCALE = 50; // 1 unit in TikZ = 50px
 
+// Detect \def\var{value} variables from TikZ code
+function detectDefVars(code) {
+    const regex = /\\def\\(\w+)\{([^}]+)\}/g;
+    const vars = [];
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+        vars.push({ name: match[1], value: match[2] });
+    }
+    return vars;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const btnRun = document.getElementById("btn-run");
     const tikzInput = document.getElementById("tikz-input");
@@ -581,6 +592,16 @@ async function recordAnimationToWebM(aspectRatio, bg) {
     return recordingDone;
 }
 
+function _findTimeShiftEffect() {
+    if (!window.player || !window.player.steps) return null;
+    for (const step of window.player.steps) {
+        for (const eff of step) {
+            if (eff.type === 'time_shift' && eff.params) return eff;
+        }
+    }
+    return null;
+}
+
 async function runCode(code) {
     try {
         const btnRun = document.getElementById("btn-run");
@@ -590,17 +611,28 @@ async function runCode(code) {
 
         // Tự động đọc @param từ code TikZ
         let paramConfig = { param_name: "t", t_min: 0, t_max: 1, total_frames: 60 };
-        const paramMatch = code.match(/@param:\s*\{([^}]+)\}/);
-        if (paramMatch) {
-            const params = paramMatch[1];
-            const nameMatch = params.match(/name:\s*(\w+)/);
-            const minMatch = params.match(/min:\s*([\d.]+)/);
-            const maxMatch = params.match(/max:\s*([\d.]+)/);
-            const framesMatch = params.match(/frames:\s*(\d+)/);
-            if (nameMatch) paramConfig.param_name = nameMatch[1];
-            if (minMatch) paramConfig.t_min = parseFloat(minMatch[1]);
-            if (maxMatch) paramConfig.t_max = parseFloat(maxMatch[1]);
-            if (framesMatch) paramConfig.total_frames = parseInt(framesMatch[1]);
+        
+        // Ưu tiên dùng time_shift effect params nếu có
+        const tsEffect = _findTimeShiftEffect();
+        if (tsEffect && tsEffect.params) {
+            const p = tsEffect.params;
+            paramConfig.param_name = p.param_name || "t";
+            paramConfig.t_min = p.begin !== undefined ? p.begin : 0;
+            paramConfig.t_max = p.end !== undefined ? p.end : 150;
+            paramConfig.total_frames = Math.round((paramConfig.t_max - paramConfig.t_min) * (p.fps || 60) / 60) || 60;
+        } else {
+            const paramMatch = code.match(/@param:\s*\{([^}]+)\}/);
+            if (paramMatch) {
+                const params = paramMatch[1];
+                const nameMatch = params.match(/name:\s*(\w+)/);
+                const minMatch = params.match(/min:\s*([\d.]+)/);
+                const maxMatch = params.match(/max:\s*([\d.]+)/);
+                const framesMatch = params.match(/frames:\s*(\d+)/);
+                if (nameMatch) paramConfig.param_name = nameMatch[1];
+                if (minMatch) paramConfig.t_min = parseFloat(minMatch[1]);
+                if (maxMatch) paramConfig.t_max = parseFloat(maxMatch[1]);
+                if (framesMatch) paramConfig.total_frames = parseInt(framesMatch[1]);
+            }
         }
 
         const response = await fetch(API_URL, {
@@ -781,11 +813,44 @@ window.renderPropDynamicOptions = (effectType) => {
             </div>
         `;
     } else if (effectType === 'time_shift') {
-        html = `
-            <div class="mb-2 p-2 bg-blue-50 rounded border border-blue-200">
-                <p class="text-[10px] text-blue-600"><i class="fa-solid fa-info-circle mr-1"></i>Time Shift di chuyển tất cả đối tượng theo frames đã bake từ backend. Không cần cấu hình thêm.</p>
-            </div>
-        `;
+        const defVars = detectDefVars(tikzInput.value);
+        if (defVars.length === 0) {
+            html = `
+                <div class="mb-2 p-2 bg-red-50 rounded border border-red-200">
+                    <p class="text-[10px] text-red-600"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Không tìm thấy biến \\def trong code TikZ. Time Shift không thể hoạt động. Hãy thêm \\def\\t{giá_trị} vào code.</p>
+                </div>
+            `;
+        } else {
+            const paramOptions = defVars.map(v =>
+                `<option value="${v.name}">${v.name} (default: ${v.value})</option>`
+            ).join('');
+            html = `
+                <div class="mb-2">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Animate Variable</label>
+                    <select id="prop-ts-param" class="w-full text-sm border border-gray-300 bg-white rounded px-2 py-1">${paramOptions}</select>
+                </div>
+                <div class="mb-2">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Begin</label>
+                    <input type="number" id="prop-ts-begin" class="w-full text-sm border border-gray-300 rounded px-2 py-1" value="${defVars[0].value}">
+                </div>
+                <div class="mb-2">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">End</label>
+                    <input type="number" id="prop-ts-end" class="w-full text-sm border border-gray-300 rounded px-2 py-1" value="150">
+                </div>
+                <div class="mb-2">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">FPS</label>
+                    <input type="number" id="prop-ts-fps" class="w-full text-sm border border-gray-300 rounded px-2 py-1" value="60" min="1" max="120">
+                </div>
+                <div class="mb-2">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Loop Mode</label>
+                    <div class="space-y-1">
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="prop-ts-loop" value="none" checked><span class="text-xs">Không lặp</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="prop-ts-loop" value="once"><span class="text-xs">Lặp 1 lần</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="prop-ts-loop" value="continuous"><span class="text-xs">Lặp liên tục</span></label>
+                    </div>
+                </div>
+            `;
+        }
     } else if (effectType === 'fade_in') {
         html = `
             <div class="mb-2">
@@ -1333,11 +1398,61 @@ window.renderEditDynamicOptions = (effectType, eff) => {
             </div>
         `;
     } else if (effectType === 'time_shift') {
-        html = `
-            <div class="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
-                <p class="text-[10px] text-blue-600"><i class="fa-solid fa-info-circle mr-1"></i>Time Shift di chuyển tất cả đối tượng theo frames đã bake từ backend. Không cần cấu hình thêm.</p>
-            </div>
-        `;
+        const defVars = detectDefVars(tikzInput.value);
+        const tsParams = eff.params || {};
+        const tsParamName = tsParams.param_name || (defVars.length > 0 ? defVars[0].name : 't');
+        const tsBegin = tsParams.begin !== undefined ? tsParams.begin : (defVars.length > 0 ? defVars[0].value : 0);
+        const tsEnd = tsParams.end !== undefined ? tsParams.end : 150;
+        const tsFps = tsParams.fps || 60;
+        const tsLoop = tsParams.loopMode || 'none';
+
+        if (defVars.length === 0) {
+            html = `
+                <div class="mb-3 p-2 bg-red-50 rounded border border-red-200">
+                    <p class="text-[10px] text-red-600"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Không tìm thấy biến \\def trong code TikZ. Time Shift không thể hoạt động. Hãy thêm \\def\\t{giá_trị} vào code.</p>
+                </div>
+            `;
+        } else {
+            const paramOptions = defVars.map(v =>
+                `<option value="${v.name}" ${v.name === tsParamName ? 'selected' : ''}>${v.name} (default: ${v.value})</option>`
+            ).join('');
+            html = `
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Animate Variable</label>
+                    <select id="edit-ts-param" class="w-full text-sm border border-gray-300 bg-white rounded px-2 py-1.5">${paramOptions}</select>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Begin</label>
+                    <input type="number" id="edit-ts-begin" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" value="${tsBegin}">
+                    <p class="text-[10px] text-gray-500 mt-1">Giá trị bắt đầu của biến</p>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">End</label>
+                    <input type="number" id="edit-ts-end" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" value="${tsEnd}">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">FPS</label>
+                    <input type="number" id="edit-ts-fps" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" value="${tsFps}" min="1" max="120">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Loop Mode</label>
+                    <div class="space-y-1">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="edit-ts-loop" value="none" ${tsLoop === 'none' ? 'checked' : ''}>
+                            <span class="text-xs">Không lặp</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="edit-ts-loop" value="once" ${tsLoop === 'once' ? 'checked' : ''}>
+                            <span class="text-xs">Lặp 1 lần rồi dừng</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="edit-ts-loop" value="continuous" ${tsLoop === 'continuous' ? 'checked' : ''}>
+                            <span class="text-xs">Lặp liên tục</span>
+                        </label>
+                    </div>
+                </div>
+            `;
+        }
     } else if (effectType === 'change_style') {
         const colorVal = eff.color || '#333333';
         html = `
@@ -1447,6 +1562,27 @@ window.saveEffectParams = () => {
         color = document.getElementById("edit-color")?.value.trim() || "rgba(169, 177, 214, 0.5)";
         const opacity = document.getElementById("edit-fill-opacity")?.value;
         if (opacity) params.opacity = parseFloat(opacity);
+    } else if (effType === 'time_shift') {
+        const defVars = detectDefVars(tikzInput.value);
+        if (defVars.length === 0) {
+            alert("⚠️ Không tìm thấy biến \\def trong code TikZ.\nTime Shift không thể hoạt động.\n\nHãy thêm \\def\\t{giá_trị} vào code.");
+            return;
+        }
+        const begin = parseFloat(document.getElementById('edit-ts-begin')?.value);
+        const end = parseFloat(document.getElementById('edit-ts-end')?.value);
+        if (isNaN(begin) || isNaN(end)) {
+            alert("⚠️ Begin và End phải là số.");
+            return;
+        }
+        if (begin >= end) {
+            alert("⚠️ Begin phải nhỏ hơn End.");
+            return;
+        }
+        params.param_name = document.getElementById('edit-ts-param')?.value || 't';
+        params.begin = begin;
+        params.end = end;
+        params.fps = parseInt(document.getElementById('edit-ts-fps')?.value) || 60;
+        params.loopMode = document.querySelector('input[name="edit-ts-loop"]:checked')?.value || 'none';
     }
     
     if (Object.keys(params).length === 0) {
@@ -1979,13 +2115,13 @@ class MathAnimPlayer {
                 const coreColor = eff.color || (eff.type === "draw_dashed_light" ? "#f97316" : "#eab308");
                 
                 const glow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                glow.setAttribute("r", "8");
+                glow.setAttribute("r", "6");
                 glow.setAttribute("fill", coreColor);
                 glow.setAttribute("opacity", "0.4");
                 glow.setAttribute("filter", "drop-shadow(0 0 6px " + coreColor + ")");
                 
                 const core = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                core.setAttribute("r", "4");
+                core.setAttribute("r", "3");
                 core.setAttribute("fill", "#ffffff");
 
                 spark.appendChild(glow);
@@ -2255,7 +2391,7 @@ class MathAnimPlayer {
             const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             dot.setAttribute("cx", this.transformX(pt.x));
             dot.setAttribute("cy", this.transformY(pt.y));
-            dot.setAttribute("r", "4");
+            dot.setAttribute("r", "3");
             const fillAttrs = parseOpts(obj.fill_options);
             dot.setAttribute("fill", fillAttrs.stroke || "#333");
             group.appendChild(dot);

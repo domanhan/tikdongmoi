@@ -499,6 +499,15 @@ def _collect_commands(tikz_code: str) -> List[str]:
     commands: List[str] = []
     current: List[str] = []
 
+    # Validate: warn if code is on a single line (potential parsing issue)
+    if "\n" not in tikz_code and ";" in tikz_code:
+        try:
+            print(
+                "[WARN] TikZ code is on a single line. Consider using newlines for better parsing."
+            )
+        except UnicodeEncodeError:
+            print("[WARN] Single-line TikZ code detected.")
+
     for line in tikz_code.split("\n"):
         stripped = line.strip()
         if not stripped or stripped.startswith("%"):

@@ -40,6 +40,7 @@ class MathEngine:
 
     def __init__(self):
         self.named_paths: Dict[str, Dict[str, Any]] = {}
+        self._warnings_shown: set = set()
 
     # -----------------------------------------------------------------------
     # API công khai
@@ -392,6 +393,10 @@ class MathEngine:
                     "center": center,
                     "radius": radius,
                 }
+            else:
+                print(
+                    f"[WARN] named_path '{path_name}': center point '{center_name}' not defined yet"
+                )
             return
 
         # Line: (A) -- (B)
@@ -407,6 +412,18 @@ class MathEngine:
                     "p1": p1,
                     "p2": p2,
                 }
+            else:
+                missing = []
+                if not p1:
+                    missing.append(p1_name)
+                if not p2:
+                    missing.append(p2_name)
+                print(
+                    f"[WARN] named_path '{path_name}': points {', '.join(missing)} not defined yet"
+                )
+            return
+
+        print(f"[WARN] named_path '{path_name}': unrecognized content '{content}'")
 
     def _handle_intersection(
         self,
@@ -430,18 +447,52 @@ class MathEngine:
         path2 = self.named_paths.get(path2_name)
 
         if not path1 or not path2:
-            print(
-                f"[WARN] Intersection: path '{path1_name}' or '{path2_name}' not found"
-            )
+            missing = []
+            if not path1:
+                missing.append(path1_name)
+            if not path2:
+                missing.append(path2_name)
+            warn_key = f"missing_path:{','.join(sorted(missing))}"
+            if warn_key not in self._warnings_shown:
+                self._warnings_shown.add(warn_key)
+                print(
+                    f"[WARN] Intersection: named path(s) {', '.join(missing)} not found. "
+                    f"Make sure \\path [name path=...] appears before intersection."
+                )
             return
 
         # Tính giao điểm dựa trên loại đường
         intersections = self._compute_intersection(path1, path2)
 
+        # Validation: warn if no intersections found
+        if len(intersections) == 0:
+            t1 = path1.get("type", "unknown")
+            t2 = path2.get("type", "unknown")
+            warn_key = f"no_intersect:{path1_name}:{path2_name}"
+            if warn_key not in self._warnings_shown:
+                self._warnings_shown.add(warn_key)
+                print(
+                    f"[WARN] Intersection: {t1} '{path1_name}' and {t2} '{path2_name}' "
+                    f"do not intersect (0 points found)."
+                )
+
         # Gán kết quả theo thứ tự
+        assigned = 0
         for i, pid in enumerate(result_points):
             if i < len(intersections):
                 points[pid] = intersections[i]
+                assigned += 1
+
+        # Warn if fewer intersections than requested
+        if assigned < len(result_points):
+            unassigned = result_points[assigned:]
+            warn_key = f"few_points:{','.join(result_points)}:{assigned}"
+            if warn_key not in self._warnings_shown:
+                self._warnings_shown.add(warn_key)
+                print(
+                    f"[WARN] Intersection: requested {len(result_points)} points but found {assigned}. "
+                    f"Point(s) {', '.join(unassigned)} will not be defined."
+                )
 
     def _compute_intersection(
         self,

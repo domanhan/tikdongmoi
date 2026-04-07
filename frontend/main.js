@@ -1054,7 +1054,63 @@ window.addEffectFromProps = () => {
     console.log('[DEBUG ADD] After push, steps:', JSON.stringify(window.player.steps));
     
     renderStepsUI();
+    
+    // Auto re-bake if time_shift effect was added
+    if (effType === 'time_shift' && params) {
+        _autoReBakeWithMoveParams(params);
+    }
 };
+
+async function _autoReBakeWithMoveParams(params) {
+    const code = window.tikzInput?.value;
+    if (!code) return;
+    
+    const btnRun = document.getElementById("btn-run");
+    const originalText = btnRun.innerHTML;
+    btnRun.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Re-baking...`;
+    btnRun.disabled = true;
+    
+    const totalFrames = Math.round((params.end - params.begin) * (params.fps || 60) / 60) || 60;
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                code: code,
+                param_name: params.param_name || "t",
+                t_min: params.begin,
+                t_max: params.end,
+                total_frames: totalFrames
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === "success") {
+            // Save current steps before init (init may reset them)
+            const savedSteps = JSON.parse(JSON.stringify(window.player.steps));
+            
+            window.visualObjects = result.data.visualObjects;
+            window.frames = result.data.frames;
+            window.player.init(window.visualObjects, window.frames, savedSteps);
+            window.player.steps = savedSteps;
+            window.player.currentStep = Math.max(1, window.player.currentStep);
+            
+            // Re-render
+            updateOutliner(window.visualObjects);
+            renderStepsUI();
+            if (window.player.steps.length > 0) {
+                window.player.jumpToStep(window.player.currentStep - 1);
+            }
+        }
+    } catch (err) {
+        console.error('[DEBUG RE-BAKE] Error:', err);
+    }
+    
+    btnRun.innerHTML = originalText;
+    btnRun.disabled = false;
+}
 
 function initStepUI() {
 
@@ -1696,6 +1752,11 @@ window.saveEffectParams = () => {
     
     window.player.jumpToStep(stepIdx);
     window.player.currentStep = stepIdx + 1;
+    
+    // Auto re-bake if time_shift effect was edited
+    if (effType === 'time_shift' && eff.params) {
+        _autoReBakeWithMoveParams(eff.params);
+    }
 };
 
 /**
@@ -2078,9 +2139,20 @@ class MathAnimPlayer {
 
             const elapsed = time - startTime;
             let allDone = true;
+            let hasLoopingEffect = false;
 
             effects.forEach(eff => {
-                let progress = Math.min(elapsed / eff.duration, 1.0);
+                let progress;
+                const isLooping = eff.type === 'time_shift' && eff.params?.loopMode && eff.params.loopMode !== 'none';
+                
+                if (isLooping) {
+                    hasLoopingEffect = true;
+                    // Don't clamp progress for looping time_shift effects
+                    progress = elapsed / eff.duration;
+                } else {
+                    progress = Math.min(elapsed / eff.duration, 1.0);
+                }
+                
                 // easeInOutQuad
                 let ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
                 
@@ -2089,7 +2161,7 @@ class MathAnimPlayer {
                 if (progress < 1.0) allDone = false;
             });
 
-            if (!allDone) {
+            if (!allDone || hasLoopingEffect) {
                 this.animationFrameId = requestAnimationFrame(animate);
             } else {
                 this.isPlaying = false;

@@ -605,6 +605,7 @@ function _findTimeShiftEffect() {
 }
 
 async function runCode(code) {
+    console.log('[DEBUG RUN] Starting runCode, steps:', JSON.stringify(window.player.steps));
     try {
         const btnRun = document.getElementById("btn-run");
         const originalText = btnRun.innerHTML;
@@ -615,7 +616,10 @@ async function runCode(code) {
         let paramConfig = { param_name: "t", t_min: 0, t_max: 1, total_frames: 60 };
         
         // Ưu tiên dùng time_shift effect params nếu có
+        console.log('[DEBUG RUN] Before _findTimeShiftEffect, steps:', JSON.stringify(window.player.steps));
         const tsEffect = _findTimeShiftEffect();
+        console.log('[DEBUG] tsEffect:', tsEffect);
+        console.log('[DEBUG] window.player.steps:', JSON.stringify(window.player.steps));
         if (tsEffect && tsEffect.params) {
             const p = tsEffect.params;
             paramConfig.param_name = p.param_name || "t";
@@ -646,6 +650,12 @@ async function runCode(code) {
             }
         }
 
+        console.log('[DEBUG] Sending to backend:', {
+            param_name: paramConfig.param_name,
+            t_min: paramConfig.t_min,
+            t_max: paramConfig.t_max,
+            total_frames: paramConfig.total_frames
+        });
         const response = await fetch(API_URL, {
             method: "POST",
             headers: {
@@ -955,8 +965,13 @@ window.renderPropDynamicOptions = (effectType) => {
 };
 
 window.addEffectFromProps = () => {
-    if (!window.selectedOutlinerObj) return;
+    console.log('[DEBUG ADD] selectedOutlinerObj:', window.selectedOutlinerObj);
+    if (!window.selectedOutlinerObj) {
+        console.log('[DEBUG ADD] FAIL: no selected object');
+        return;
+    }
     let currentStep = window.player.currentStep;
+    console.log('[DEBUG ADD] currentStep:', currentStep, 'steps.length:', window.player.steps.length);
     if (window.player.steps.length === 0) {
         window.player.steps.push([]);
         window.player.currentStep = 1;
@@ -967,6 +982,7 @@ window.addEffectFromProps = () => {
     
     const effType = document.getElementById("prop-effect").value;
     const duration = parseInt(document.getElementById("prop-duration").value) || 1000;
+    console.log('[DEBUG ADD] effType:', effType, 'duration:', duration);
     
     // Collect params from dynamic UI
     let params = {};
@@ -988,23 +1004,29 @@ window.addEffectFromProps = () => {
         if (opacity) params.opacity = parseFloat(opacity);
     } else if (effType === 'time_shift') {
         const defVars = detectDefVars();
+        console.log('[DEBUG ADD] defVars:', defVars);
         if (defVars.length === 0) {
             alert("⚠️ Không tìm thấy biến \\def trong code TikZ.\nTime Shift không thể hoạt động.\n\nHãy thêm \\def\\t{giá_trị} vào code.");
+            console.log('[DEBUG ADD] FAIL: no def vars');
             return;
         }
         const begin = parseFloat(document.getElementById('prop-ts-begin')?.value);
         const endStr = document.getElementById('prop-ts-end')?.value.trim();
+        console.log('[DEBUG ADD] begin:', begin, 'endStr:', endStr);
         if (!endStr) {
             alert("⚠️ Vui lòng nhập giá trị End.\n\nEnd phải lớn hơn Begin (giá trị tự động từ \\def).");
+            console.log('[DEBUG ADD] FAIL: empty end');
             return;
         }
         const end = parseFloat(endStr);
         if (isNaN(begin) || isNaN(end)) {
             alert("⚠️ Begin và End phải là số.");
+            console.log('[DEBUG ADD] FAIL: NaN');
             return;
         }
         if (begin >= end) {
             alert("⚠️ End phải lớn hơn Begin.\n\nBegin được tự động lấy từ \\def trong code TikZ.");
+            console.log('[DEBUG ADD] FAIL: begin >= end');
             return;
         }
         params.param_name = document.getElementById('prop-ts-param')?.value || 't';
@@ -1012,19 +1034,24 @@ window.addEffectFromProps = () => {
         params.end = end;
         params.fps = parseInt(document.getElementById('prop-ts-fps')?.value) || 60;
         params.loopMode = document.querySelector('input[name="prop-ts-loop"]:checked')?.value || 'none';
+        console.log('[DEBUG ADD] time_shift params:', params);
     }
     
     // Remove empty params
     if (Object.keys(params).length === 0) params = undefined;
     
     const objId = window.selectedOutlinerObj._id;
-    window.player.steps[currentStep - 1].push({
+    const effect = {
         target_id: objId,
         type: effType,
         duration: duration,
         color: color,
         params: params
-    });
+    };
+    console.log('[DEBUG ADD] Adding effect:', effect);
+    console.log('[DEBUG ADD] Before push, steps:', JSON.stringify(window.player.steps));
+    window.player.steps[currentStep - 1].push(effect);
+    console.log('[DEBUG ADD] After push, steps:', JSON.stringify(window.player.steps));
     
     renderStepsUI();
 };
@@ -1210,6 +1237,7 @@ function initStepUI() {
 }
 
 function renderStepsUI() {
+    console.log('[DEBUG renderStepsUI] Input steps:', JSON.stringify(window.player.steps));
     const container = document.getElementById('timeline-steps');
     container.innerHTML = "";
     

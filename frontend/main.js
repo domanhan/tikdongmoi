@@ -2225,7 +2225,34 @@ class MathAnimPlayer {
         }
         else if (eff.type === "time_shift" && this.frames.length > 0) {
             const totalFrames = this.frames.length;
-            let fIndex = Math.round(progress * (totalFrames - 1));
+            const params = eff.params || {};
+            const begin = params.begin || 0;
+            const end = params.end || 1;
+            const loopMode = params.loopMode || "none";
+            
+            // Map progress to frame index based on begin/end range
+            let effectiveProgress;
+            if (loopMode === "none") {
+                effectiveProgress = Math.min(progress, 1.0);
+            } else if (loopMode === "once") {
+                // Progress 0→1 = begin→end, 1→2 = end→begin, >2 = stop at begin
+                if (progress <= 1.0) {
+                    effectiveProgress = progress;
+                } else if (progress <= 2.0) {
+                    effectiveProgress = 2.0 - progress; // Reverse
+                } else {
+                    effectiveProgress = 0; // Stop at begin
+                }
+            } else if (loopMode === "continuous") {
+                // Ping-pong loop: 0→1→0→1→...
+                const cycle = Math.floor(progress);
+                const localProgress = progress - cycle;
+                effectiveProgress = cycle % 2 === 0 ? localProgress : 1.0 - localProgress;
+            } else {
+                effectiveProgress = Math.min(progress, 1.0);
+            }
+            
+            let fIndex = Math.round(effectiveProgress * (totalFrames - 1));
             fIndex = Math.max(0, Math.min(fIndex, totalFrames - 1));
             const currentPts = this.frames[fIndex].points;
             

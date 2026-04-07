@@ -79,9 +79,6 @@ async def bake_frames(data: BakeInput):
     Trả về cả visual_objects (cho Phase 4 vẽ) và frames (tọa độ theo thời gian).
     """
     try:
-        print(
-            f"[DEBUG BAKE] param_name={data.param_name}, t_min={data.t_min}, t_max={data.t_max}, total_frames={data.total_frames}"
-        )
         parsed = parse_tikz(data.code)
         engine = MathEngine()
         frames = engine.bake_frames(
@@ -91,10 +88,6 @@ async def bake_frames(data: BakeInput):
             t_max=data.t_max,
             total_frames=data.total_frames,
         )
-        # Debug: check first and last frame points
-        if frames:
-            print(f"[DEBUG BAKE] Frame 0 A: {frames[0]['points'].get('A')}")
-            print(f"[DEBUG BAKE] Frame last A: {frames[-1]['points'].get('A')}")
         return {
             "status": "success",
             "data": {

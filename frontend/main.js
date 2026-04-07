@@ -605,7 +605,6 @@ function _findTimeShiftEffect() {
 }
 
 async function runCode(code) {
-    console.log('[DEBUG RUN] Starting runCode, steps:', JSON.stringify(window.player.steps));
     try {
         const btnRun = document.getElementById("btn-run");
         const originalText = btnRun.innerHTML;
@@ -616,10 +615,7 @@ async function runCode(code) {
         let paramConfig = { param_name: "t", t_min: 0, t_max: 1, total_frames: 60 };
         
         // Ưu tiên dùng time_shift effect params nếu có
-        console.log('[DEBUG RUN] Before _findTimeShiftEffect, steps:', JSON.stringify(window.player.steps));
         const tsEffect = _findTimeShiftEffect();
-        console.log('[DEBUG] tsEffect:', tsEffect);
-        console.log('[DEBUG] window.player.steps:', JSON.stringify(window.player.steps));
         if (tsEffect && tsEffect.params) {
             const p = tsEffect.params;
             paramConfig.param_name = p.param_name || "t";
@@ -650,12 +646,6 @@ async function runCode(code) {
             }
         }
 
-        console.log('[DEBUG] Sending to backend:', {
-            param_name: paramConfig.param_name,
-            t_min: paramConfig.t_min,
-            t_max: paramConfig.t_max,
-            total_frames: paramConfig.total_frames
-        });
         const response = await fetch(API_URL, {
             method: "POST",
             headers: {
@@ -868,8 +858,7 @@ window.renderPropDynamicOptions = (effectType) => {
                     <label class="block text-xs font-bold text-gray-700 mb-1">Loop Mode</label>
                     <div class="space-y-1">
                         <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="prop-ts-loop" value="none" checked><span class="text-xs">Không lặp</span></label>
-                        <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="prop-ts-loop" value="once"><span class="text-xs">Lặp 1 lần</span></label>
-                        <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="prop-ts-loop" value="continuous"><span class="text-xs">Lặp liên tục</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="prop-ts-loop" value="once"><span class="text-xs">Đi tới rồi quay lại (1 lần)</span></label>
                     </div>
                 </div>
             `;
@@ -965,13 +954,8 @@ window.renderPropDynamicOptions = (effectType) => {
 };
 
 window.addEffectFromProps = () => {
-    console.log('[DEBUG ADD] selectedOutlinerObj:', window.selectedOutlinerObj);
-    if (!window.selectedOutlinerObj) {
-        console.log('[DEBUG ADD] FAIL: no selected object');
-        return;
-    }
+    if (!window.selectedOutlinerObj) return;
     let currentStep = window.player.currentStep;
-    console.log('[DEBUG ADD] currentStep:', currentStep, 'steps.length:', window.player.steps.length);
     if (window.player.steps.length === 0) {
         window.player.steps.push([]);
         window.player.currentStep = 1;
@@ -982,7 +966,6 @@ window.addEffectFromProps = () => {
     
     const effType = document.getElementById("prop-effect").value;
     const duration = parseInt(document.getElementById("prop-duration").value) || 1000;
-    console.log('[DEBUG ADD] effType:', effType, 'duration:', duration);
     
     // Collect params from dynamic UI
     let params = {};
@@ -1004,29 +987,23 @@ window.addEffectFromProps = () => {
         if (opacity) params.opacity = parseFloat(opacity);
     } else if (effType === 'time_shift') {
         const defVars = detectDefVars();
-        console.log('[DEBUG ADD] defVars:', defVars);
         if (defVars.length === 0) {
             alert("⚠️ Không tìm thấy biến \\def trong code TikZ.\nTime Shift không thể hoạt động.\n\nHãy thêm \\def\\t{giá_trị} vào code.");
-            console.log('[DEBUG ADD] FAIL: no def vars');
             return;
         }
         const begin = parseFloat(document.getElementById('prop-ts-begin')?.value);
         const endStr = document.getElementById('prop-ts-end')?.value.trim();
-        console.log('[DEBUG ADD] begin:', begin, 'endStr:', endStr);
         if (!endStr) {
             alert("⚠️ Vui lòng nhập giá trị End.\n\nEnd phải lớn hơn Begin (giá trị tự động từ \\def).");
-            console.log('[DEBUG ADD] FAIL: empty end');
             return;
         }
         const end = parseFloat(endStr);
         if (isNaN(begin) || isNaN(end)) {
             alert("⚠️ Begin và End phải là số.");
-            console.log('[DEBUG ADD] FAIL: NaN');
             return;
         }
         if (begin >= end) {
             alert("⚠️ End phải lớn hơn Begin.\n\nBegin được tự động lấy từ \\def trong code TikZ.");
-            console.log('[DEBUG ADD] FAIL: begin >= end');
             return;
         }
         params.param_name = document.getElementById('prop-ts-param')?.value || 't';
@@ -1034,24 +1011,19 @@ window.addEffectFromProps = () => {
         params.end = end;
         params.fps = parseInt(document.getElementById('prop-ts-fps')?.value) || 60;
         params.loopMode = document.querySelector('input[name="prop-ts-loop"]:checked')?.value || 'none';
-        console.log('[DEBUG ADD] time_shift params:', params);
     }
     
     // Remove empty params
     if (Object.keys(params).length === 0) params = undefined;
     
     const objId = window.selectedOutlinerObj._id;
-    const effect = {
+    window.player.steps[currentStep - 1].push({
         target_id: objId,
         type: effType,
         duration: duration,
         color: color,
         params: params
-    };
-    console.log('[DEBUG ADD] Adding effect:', effect);
-    console.log('[DEBUG ADD] Before push, steps:', JSON.stringify(window.player.steps));
-    window.player.steps[currentStep - 1].push(effect);
-    console.log('[DEBUG ADD] After push, steps:', JSON.stringify(window.player.steps));
+    });
     
     renderStepsUI();
 };
@@ -1237,7 +1209,6 @@ function initStepUI() {
 }
 
 function renderStepsUI() {
-    console.log('[DEBUG renderStepsUI] Input steps:', JSON.stringify(window.player.steps));
     const container = document.getElementById('timeline-steps');
     container.innerHTML = "";
     
@@ -1525,11 +1496,7 @@ window.renderEditDynamicOptions = (effectType, eff) => {
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="edit-ts-loop" value="once" ${tsLoop === 'once' ? 'checked' : ''}>
-                            <span class="text-xs">Lặp 1 lần rồi dừng</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="edit-ts-loop" value="continuous" ${tsLoop === 'continuous' ? 'checked' : ''}>
-                            <span class="text-xs">Lặp liên tục</span>
+                            <span class="text-xs">Đi tới rồi quay lại (1 lần)</span>
                         </label>
                     </div>
                 </div>
@@ -2080,13 +2047,22 @@ class MathAnimPlayer {
             let allDone = true;
 
             effects.forEach(eff => {
-                let progress = Math.min(elapsed / eff.duration, 1.0);
+                let progress;
+                const isLoopOnce = eff.type === 'time_shift' && eff.params?.loopMode === 'once';
+                
+                if (isLoopOnce) {
+                    // Loop once: 0→1→0 (forward then backward), max progress = 2.0
+                    progress = Math.min(elapsed / eff.duration, 2.0);
+                } else {
+                    progress = Math.min(elapsed / eff.duration, 1.0);
+                }
+                
                 // easeInOutQuad
                 let ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
                 
                 this._applyEffectTick(eff, ease);
                 
-                if (progress < 1.0) allDone = false;
+                if (progress < (isLoopOnce ? 2.0 : 1.0)) allDone = false;
             });
 
             if (!allDone) {
@@ -2331,22 +2307,13 @@ class MathAnimPlayer {
             
             // Map progress to frame index based on begin/end range
             let effectiveProgress;
-            if (loopMode === "none") {
-                effectiveProgress = Math.min(progress, 1.0);
-            } else if (loopMode === "once") {
-                // Progress 0→1 = begin→end, 1→2 = end→begin, >2 = stop at begin
+            if (loopMode === "once") {
+                // Progress 0→1 = begin→end, 1→2 = end→begin
                 if (progress <= 1.0) {
                     effectiveProgress = progress;
-                } else if (progress <= 2.0) {
-                    effectiveProgress = 2.0 - progress; // Reverse
                 } else {
-                    effectiveProgress = 0; // Stop at begin
+                    effectiveProgress = 2.0 - progress; // Reverse
                 }
-            } else if (loopMode === "continuous") {
-                // Ping-pong loop: 0→1→0→1→...
-                const cycle = Math.floor(progress);
-                const localProgress = progress - cycle;
-                effectiveProgress = cycle % 2 === 0 ? localProgress : 1.0 - localProgress;
             } else {
                 effectiveProgress = Math.min(progress, 1.0);
             }

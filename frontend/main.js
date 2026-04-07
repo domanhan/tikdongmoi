@@ -9,6 +9,8 @@ const SCALE = 50; // 1 unit in TikZ = 50px
 
 // Detect \def\var{value} variables from TikZ code
 function detectDefVars(code) {
+    if (!code && window.tikzInput) code = window.tikzInput.value;
+    if (!code) return [];
     const regex = /\\def\\(\w+)\{([^}]+)\}/g;
     const vars = [];
     let match;
@@ -20,7 +22,7 @@ function detectDefVars(code) {
 
 document.addEventListener("DOMContentLoaded", () => {
     const btnRun = document.getElementById("btn-run");
-    const tikzInput = document.getElementById("tikz-input");
+    const tikzInput = window.tikzInput = document.getElementById("tikz-input");
     
     // Canvas Mode State
     window.canvasMode = { dark: false };
@@ -813,7 +815,7 @@ window.renderPropDynamicOptions = (effectType) => {
             </div>
         `;
     } else if (effectType === 'time_shift') {
-        const defVars = detectDefVars(tikzInput.value);
+        const defVars = detectDefVars();
         if (defVars.length === 0) {
             html = `
                 <div class="mb-2 p-2 bg-red-50 rounded border border-red-200">
@@ -960,6 +962,27 @@ window.addEffectFromProps = () => {
         color = document.getElementById("prop-color")?.value.trim() || "rgba(169, 177, 214, 0.5)";
         const opacity = document.getElementById("prop-fill-opacity")?.value;
         if (opacity) params.opacity = parseFloat(opacity);
+    } else if (effType === 'time_shift') {
+        const defVars = detectDefVars();
+        if (defVars.length === 0) {
+            alert("⚠️ Không tìm thấy biến \\def trong code TikZ.\nTime Shift không thể hoạt động.\n\nHãy thêm \\def\\t{giá_trị} vào code.");
+            return;
+        }
+        const begin = parseFloat(document.getElementById('prop-ts-begin')?.value);
+        const end = parseFloat(document.getElementById('prop-ts-end')?.value);
+        if (isNaN(begin) || isNaN(end)) {
+            alert("⚠️ Begin và End phải là số.");
+            return;
+        }
+        if (begin >= end) {
+            alert("⚠️ Begin phải nhỏ hơn End.");
+            return;
+        }
+        params.param_name = document.getElementById('prop-ts-param')?.value || 't';
+        params.begin = begin;
+        params.end = end;
+        params.fps = parseInt(document.getElementById('prop-ts-fps')?.value) || 60;
+        params.loopMode = document.querySelector('input[name="prop-ts-loop"]:checked')?.value || 'none';
     }
     
     // Remove empty params
@@ -1398,7 +1421,7 @@ window.renderEditDynamicOptions = (effectType, eff) => {
             </div>
         `;
     } else if (effectType === 'time_shift') {
-        const defVars = detectDefVars(tikzInput.value);
+        const defVars = detectDefVars();
         const tsParams = eff.params || {};
         const tsParamName = tsParams.param_name || (defVars.length > 0 ? defVars[0].name : 't');
         const tsBegin = tsParams.begin !== undefined ? tsParams.begin : (defVars.length > 0 ? defVars[0].value : 0);
@@ -1563,7 +1586,7 @@ window.saveEffectParams = () => {
         const opacity = document.getElementById("edit-fill-opacity")?.value;
         if (opacity) params.opacity = parseFloat(opacity);
     } else if (effType === 'time_shift') {
-        const defVars = detectDefVars(tikzInput.value);
+        const defVars = detectDefVars();
         if (defVars.length === 0) {
             alert("⚠️ Không tìm thấy biến \\def trong code TikZ.\nTime Shift không thể hoạt động.\n\nHãy thêm \\def\\t{giá_trị} vào code.");
             return;

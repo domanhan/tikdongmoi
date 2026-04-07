@@ -1026,7 +1026,63 @@ window.addEffectFromProps = () => {
     });
     
     renderStepsUI();
+    
+    // Auto re-bake if time_shift effect was added
+    if (effType === 'time_shift' && params) {
+        _autoReBakeWithMoveParams(params);
+    }
 };
+
+async function _autoReBakeWithMoveParams(params) {
+    const code = window.tikzInput?.value;
+    if (!code) return;
+    
+    const btnRun = document.getElementById("btn-run");
+    const originalText = btnRun.innerHTML;
+    btnRun.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Re-baking...`;
+    btnRun.disabled = true;
+    
+    const totalFrames = Math.round((params.end - params.begin) * (params.fps || 60) / 60) || 60;
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                code: code,
+                param_name: params.param_name || "t",
+                t_min: params.begin,
+                t_max: params.end,
+                total_frames: totalFrames
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === "success") {
+            // Save current steps before init (init may reset them)
+            const savedSteps = JSON.parse(JSON.stringify(window.player.steps));
+            
+            window.visualObjects = result.data.visualObjects;
+            window.frames = result.data.frames;
+            window.player.init(window.visualObjects, window.frames, savedSteps);
+            window.player.steps = savedSteps;
+            window.player.currentStep = Math.max(1, window.player.currentStep);
+            
+            // Re-render
+            updateOutliner(window.visualObjects);
+            renderStepsUI();
+            if (window.player.steps.length > 0) {
+                window.player.jumpToStep(window.player.currentStep - 1);
+            }
+        }
+    } catch (err) {
+        console.error('[DEBUG RE-BAKE] Error:', err);
+    }
+    
+    btnRun.innerHTML = originalText;
+    btnRun.disabled = false;
+}
 
 function initStepUI() {
 
@@ -1663,6 +1719,11 @@ window.saveEffectParams = () => {
     
     window.player.jumpToStep(stepIdx);
     window.player.currentStep = stepIdx + 1;
+    
+    // Auto re-bake if time_shift effect was edited
+    if (effType === 'time_shift' && eff.params) {
+        _autoReBakeWithMoveParams(eff.params);
+    }
 };
 
 /**

@@ -371,11 +371,27 @@ def _extract_visual(cmd_type: str, m: re.Match) -> Dict[str, Any]:
         }
 
     if cmd_type == "draw_arc":
+        opts = (g[0] or "").strip()
+        start = g[1].strip()
+        arc_params = g[2].strip()
+
+        # Parse startAngle:endAngle:radius
+        arc_match = re.match(r"([^:]+):([^:]+):(.+)", arc_params)
+        if arc_match:
+            return {
+                "type": cmd_type,
+                "options": opts,
+                "start": start,
+                "start_angle": arc_match.group(1).strip(),
+                "end_angle": arc_match.group(2).strip(),
+                "radius": arc_match.group(3).strip(),
+            }
+
         return {
             "type": cmd_type,
-            "options": (g[0] or "").strip(),
-            "start": g[1].strip(),
-            "arc_params": g[2].strip(),
+            "options": opts,
+            "start": start,
+            "arc_params": arc_params,
         }
 
     if cmd_type == "fill_node":

@@ -2054,6 +2054,40 @@ class MathAnimPlayer {
                 dom.setAttribute("data-fpath", fPath);
                 group.appendChild(dom);
             }
+            else if (obj.type === "draw_arc") {
+                const startPt = getPt(obj.start);
+                const startAngle = parseFloat(obj.start_angle) * Math.PI / 180;
+                const endAngle = parseFloat(obj.end_angle) * Math.PI / 180;
+                const r = parseFloat(obj.radius) || 1;
+                
+                // Tính tâm cung tròn: từ start point, đi ngược lại hướng startAngle với bán kính r
+                const cx = startPt.x - r * Math.cos(startAngle);
+                const cy = startPt.y - r * Math.sin(startAngle);
+                
+                // Tính điểm cuối
+                const endX = cx + r * Math.cos(endAngle);
+                const endY = cy + r * Math.sin(endAngle);
+                
+                // SVG arc flags
+                let angleDiff = Math.abs(parseFloat(obj.end_angle) - parseFloat(obj.start_angle));
+                while (angleDiff > 360) angleDiff -= 360;
+                const largeArc = angleDiff > 180 ? 1 : 0;
+                const sweep = parseFloat(obj.end_angle) > parseFloat(obj.start_angle) ? 1 : 0;
+                
+                const rPx = r * SCALE * this.zoom;
+                const d = `M ${this.transformX(startPt.x)} ${this.transformY(startPt.y)} A ${rPx} ${rPx} 0 ${largeArc} ${sweep} ${this.transformX(endX)} ${this.transformY(endY)}`;
+                
+                dom = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                dom.setAttribute("d", d);
+                dom.setAttribute("fill", "none");
+                dom.setAttribute("stroke", this.darkMode ? '#f0f0f0' : '#333');
+                dom.setAttribute("stroke-width", "2");
+                dom.setAttribute("stroke-linecap", "round");
+                dom.setAttribute("stroke-linejoin", "round");
+                const attrs = parseOpts(obj.options);
+                for (let k in attrs) dom.setAttribute(k, attrs[k]);
+                group.appendChild(dom);
+            }
             
             if (obj.type !== "fill_node" && obj.type !== "node_label" && obj.type !== "draw_line_label") {
                 // simple elements cache
@@ -2498,6 +2532,28 @@ class MathAnimPlayer {
                     const isFillActive = subItem.dom.getAttribute("data-origin-fill");
                     subItem.dom.setAttribute("d", isFillActive ? fPath : lPath);
                 }
+                // Cập nhật cung tròn arc
+                else if (obj.type === "draw_arc") {
+                    const startPt = currentPts[obj.start] || {x:0, y:0};
+                    const startAngle = parseFloat(obj.start_angle) * Math.PI / 180;
+                    const endAngle = parseFloat(obj.end_angle) * Math.PI / 180;
+                    const r = parseFloat(obj.radius) || 1;
+                    
+                    const cx = startPt.x - r * Math.cos(startAngle);
+                    const cy = startPt.y - r * Math.sin(startAngle);
+                    const endX = cx + r * Math.cos(endAngle);
+                    const endY = cy + r * Math.sin(endAngle);
+                    
+                    let angleDiff = Math.abs(parseFloat(obj.end_angle) - parseFloat(obj.start_angle));
+                    while (angleDiff > 360) angleDiff -= 360;
+                    const largeArc = angleDiff > 180 ? 1 : 0;
+                    const sweep = parseFloat(obj.end_angle) > parseFloat(obj.start_angle) ? 1 : 0;
+                    
+                    const rPx = r * SCALE * this.zoom;
+                    const d = `M ${this.transformX(startPt.x)} ${this.transformY(startPt.y)} A ${rPx} ${rPx} 0 ${largeArc} ${sweep} ${this.transformX(endX)} ${this.transformY(endY)}`;
+                    
+                    subItem.dom.setAttribute("d", d);
+                }
             });
         }
     }
@@ -2657,6 +2713,38 @@ class MathAnimPlayer {
             path.setAttribute("data-fpath", fPath);
             if (isFillActive) path.setAttribute("data-origin-fill", isFillActive);
             group.appendChild(path);
+            if (item) item.dom = path;
+        }
+        else if (obj.type === "draw_arc") {
+            const startPt = getPt(obj.start);
+            const startAngle = parseFloat(obj.start_angle) * Math.PI / 180;
+            const endAngle = parseFloat(obj.end_angle) * Math.PI / 180;
+            const r = parseFloat(obj.radius) || 1;
+            
+            const cx = startPt.x - r * Math.cos(startAngle);
+            const cy = startPt.y - r * Math.sin(startAngle);
+            const endX = cx + r * Math.cos(endAngle);
+            const endY = cy + r * Math.sin(endAngle);
+            
+            let angleDiff = Math.abs(parseFloat(obj.end_angle) - parseFloat(obj.start_angle));
+            while (angleDiff > 360) angleDiff -= 360;
+            const largeArc = angleDiff > 180 ? 1 : 0;
+            const sweep = parseFloat(obj.end_angle) > parseFloat(obj.start_angle) ? 1 : 0;
+            
+            const rPx = r * SCALE * this.zoom;
+            const d = `M ${this.transformX(startPt.x)} ${this.transformY(startPt.y)} A ${rPx} ${rPx} 0 ${largeArc} ${sweep} ${this.transformX(endX)} ${this.transformY(endY)}`;
+            
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", d);
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke", this.darkMode ? '#f0f0f0' : '#333');
+            path.setAttribute("stroke-width", "2");
+            path.setAttribute("stroke-linecap", "round");
+            path.setAttribute("stroke-linejoin", "round");
+            const attrs = parseOpts(obj.options);
+            for (let k in attrs) path.setAttribute(k, attrs[k]);
+            group.appendChild(path);
+            const item = this.svgElements[obj._id];
             if (item) item.dom = path;
         }
     }

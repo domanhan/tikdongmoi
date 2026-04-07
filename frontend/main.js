@@ -635,6 +635,15 @@ async function runCode(code) {
                 if (maxMatch) paramConfig.t_max = parseFloat(maxMatch[1]);
                 if (framesMatch) paramConfig.total_frames = parseInt(framesMatch[1]);
             }
+            // Auto-detect \def value làm t_min (begin)
+            const defVars = detectDefVars(code);
+            const defParam = defVars.find(v => v.name === paramConfig.param_name);
+            if (defParam) {
+                const defValue = parseFloat(defParam.value);
+                if (!isNaN(defValue)) {
+                    paramConfig.t_min = defValue;
+                }
+            }
         }
 
         const response = await fetch(API_URL, {
@@ -824,7 +833,7 @@ window.renderPropDynamicOptions = (effectType) => {
             `;
         } else {
             const paramOptions = defVars.map(v =>
-                `<option value="${v.name}">${v.name} (default: ${v.value})</option>`
+                `<option value="${v.name}">${v.name} (\\def${v.name}{${v.value}})</option>`
             ).join('');
             html = `
                 <div class="mb-2">
@@ -832,12 +841,14 @@ window.renderPropDynamicOptions = (effectType) => {
                     <select id="prop-ts-param" class="w-full text-sm border border-gray-300 bg-white rounded px-2 py-1">${paramOptions}</select>
                 </div>
                 <div class="mb-2">
-                    <label class="block text-xs font-bold text-gray-700 mb-1">Begin</label>
-                    <input type="number" id="prop-ts-begin" class="w-full text-sm border border-gray-300 rounded px-2 py-1" value="${defVars[0].value}">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Begin (auto từ \\def)</label>
+                    <input type="number" id="prop-ts-begin" class="w-full text-sm border border-gray-300 bg-gray-100 rounded px-2 py-1" value="${defVars[0].value}" readonly>
+                    <p class="text-[10px] text-gray-500 mt-1">Giá trị bắt đầu từ \\def${defVars[0].name}{${defVars[0].value}}</p>
                 </div>
                 <div class="mb-2">
-                    <label class="block text-xs font-bold text-gray-700 mb-1">End</label>
-                    <input type="number" id="prop-ts-end" class="w-full text-sm border border-gray-300 rounded px-2 py-1" value="150">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">End (nhập vào)</label>
+                    <input type="number" id="prop-ts-end" class="w-full text-sm border border-gray-300 rounded px-2 py-1" placeholder="Nhập giá trị kết thúc...">
+                    <p class="text-[10px] text-gray-500 mt-1">Phải lớn hơn Begin</p>
                 </div>
                 <div class="mb-2">
                     <label class="block text-xs font-bold text-gray-700 mb-1">FPS</label>
@@ -852,6 +863,19 @@ window.renderPropDynamicOptions = (effectType) => {
                     </div>
                 </div>
             `;
+            // Bind param change to update begin
+            setTimeout(() => {
+                const paramSelect = document.getElementById('prop-ts-param');
+                if (paramSelect) {
+                    paramSelect.addEventListener('change', (e) => {
+                        const selectedVar = defVars.find(v => v.name === e.target.value);
+                        if (selectedVar) {
+                            document.getElementById('prop-ts-begin').value = selectedVar.value;
+                            document.getElementById('prop-ts-begin').nextElementSibling.textContent = `Giá trị bắt đầu từ \\def${selectedVar.name}{${selectedVar.value}}`;
+                        }
+                    });
+                }
+            }, 0);
         }
     } else if (effectType === 'fade_in') {
         html = `
@@ -969,13 +993,18 @@ window.addEffectFromProps = () => {
             return;
         }
         const begin = parseFloat(document.getElementById('prop-ts-begin')?.value);
-        const end = parseFloat(document.getElementById('prop-ts-end')?.value);
+        const endStr = document.getElementById('prop-ts-end')?.value.trim();
+        if (!endStr) {
+            alert("⚠️ Vui lòng nhập giá trị End.\n\nEnd phải lớn hơn Begin (giá trị tự động từ \\def).");
+            return;
+        }
+        const end = parseFloat(endStr);
         if (isNaN(begin) || isNaN(end)) {
             alert("⚠️ Begin và End phải là số.");
             return;
         }
         if (begin >= end) {
-            alert("⚠️ Begin phải nhỏ hơn End.");
+            alert("⚠️ End phải lớn hơn Begin.\n\nBegin được tự động lấy từ \\def trong code TikZ.");
             return;
         }
         params.param_name = document.getElementById('prop-ts-param')?.value || 't';
@@ -1424,8 +1453,9 @@ window.renderEditDynamicOptions = (effectType, eff) => {
         const defVars = detectDefVars();
         const tsParams = eff.params || {};
         const tsParamName = tsParams.param_name || (defVars.length > 0 ? defVars[0].name : 't');
-        const tsBegin = tsParams.begin !== undefined ? tsParams.begin : (defVars.length > 0 ? defVars[0].value : 0);
-        const tsEnd = tsParams.end !== undefined ? tsParams.end : 150;
+        const selectedDefVar = defVars.find(v => v.name === tsParamName);
+        const tsBegin = selectedDefVar ? selectedDefVar.value : (defVars.length > 0 ? defVars[0].value : 0);
+        const tsEnd = tsParams.end !== undefined ? tsParams.end : '';
         const tsFps = tsParams.fps || 60;
         const tsLoop = tsParams.loopMode || 'none';
 
@@ -1437,7 +1467,7 @@ window.renderEditDynamicOptions = (effectType, eff) => {
             `;
         } else {
             const paramOptions = defVars.map(v =>
-                `<option value="${v.name}" ${v.name === tsParamName ? 'selected' : ''}>${v.name} (default: ${v.value})</option>`
+                `<option value="${v.name}" ${v.name === tsParamName ? 'selected' : ''}>${v.name} (\\def${v.name}{${v.value}})</option>`
             ).join('');
             html = `
                 <div class="mb-3">
@@ -1445,13 +1475,14 @@ window.renderEditDynamicOptions = (effectType, eff) => {
                     <select id="edit-ts-param" class="w-full text-sm border border-gray-300 bg-white rounded px-2 py-1.5">${paramOptions}</select>
                 </div>
                 <div class="mb-3">
-                    <label class="block text-xs font-bold text-gray-700 mb-1">Begin</label>
-                    <input type="number" id="edit-ts-begin" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" value="${tsBegin}">
-                    <p class="text-[10px] text-gray-500 mt-1">Giá trị bắt đầu của biến</p>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Begin (auto từ \\def)</label>
+                    <input type="number" id="edit-ts-begin" class="w-full text-sm border border-gray-300 bg-gray-100 rounded px-2 py-1.5" value="${tsBegin}" readonly>
+                    <p class="text-[10px] text-gray-500 mt-1">Giá trị bắt đầu từ \\def${tsParamName}{${tsBegin}}</p>
                 </div>
                 <div class="mb-3">
-                    <label class="block text-xs font-bold text-gray-700 mb-1">End</label>
-                    <input type="number" id="edit-ts-end" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" value="${tsEnd}">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">End (nhập vào)</label>
+                    <input type="number" id="edit-ts-end" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5" value="${tsEnd}" placeholder="Nhập giá trị kết thúc...">
+                    <p class="text-[10px] text-gray-500 mt-1">Phải lớn hơn Begin</p>
                 </div>
                 <div class="mb-3">
                     <label class="block text-xs font-bold text-gray-700 mb-1">FPS</label>
@@ -1475,6 +1506,18 @@ window.renderEditDynamicOptions = (effectType, eff) => {
                     </div>
                 </div>
             `;
+            setTimeout(() => {
+                const paramSelect = document.getElementById('edit-ts-param');
+                if (paramSelect) {
+                    paramSelect.addEventListener('change', (e) => {
+                        const selectedVar = defVars.find(v => v.name === e.target.value);
+                        if (selectedVar) {
+                            document.getElementById('edit-ts-begin').value = selectedVar.value;
+                            document.getElementById('edit-ts-begin').nextElementSibling.textContent = `Giá trị bắt đầu từ \\def${selectedVar.name}{${selectedVar.value}}`;
+                        }
+                    });
+                }
+            }, 0);
         }
     } else if (effectType === 'change_style') {
         const colorVal = eff.color || '#333333';
@@ -1592,13 +1635,18 @@ window.saveEffectParams = () => {
             return;
         }
         const begin = parseFloat(document.getElementById('edit-ts-begin')?.value);
-        const end = parseFloat(document.getElementById('edit-ts-end')?.value);
+        const endStr = document.getElementById('edit-ts-end')?.value.trim();
+        if (!endStr) {
+            alert("⚠️ Vui lòng nhập giá trị End.\n\nEnd phải lớn hơn Begin (giá trị tự động từ \\def).");
+            return;
+        }
+        const end = parseFloat(endStr);
         if (isNaN(begin) || isNaN(end)) {
             alert("⚠️ Begin và End phải là số.");
             return;
         }
         if (begin >= end) {
-            alert("⚠️ Begin phải nhỏ hơn End.");
+            alert("⚠️ End phải lớn hơn Begin.\n\nBegin được tự động lấy từ \\def trong code TikZ.");
             return;
         }
         params.param_name = document.getElementById('edit-ts-param')?.value || 't';
